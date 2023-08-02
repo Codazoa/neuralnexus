@@ -20,7 +20,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
     <>
       <div className='flex'>
         <div className='flex flex-col min-h-screen md:flex-row flex-1'>
-          <aside className='w-full md:w-60'>
+          <aside className='w-full bg-gray-100 md:w-60'>
             <nav>
               <ul>
                 {menuItems.map(({ href, title }) => (
