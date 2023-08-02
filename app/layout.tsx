@@ -1,5 +1,5 @@
 import './globals.css';
-import NavMenu from './NavMenu';
+import NavMenu from '../components/NavMenu';
 import { Open_Sans } from 'next/font/google';
 import AuthProvider from './AuthProvider';
 
@@ -19,7 +19,7 @@ export default function RootLayout({
     <AuthProvider>
       <html lang="en">
         <body className={myFont.className}>
-          <div className='container'>
+          <div>
             <NavMenu />
             {children}
           </div>
