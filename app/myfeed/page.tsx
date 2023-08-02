@@ -1,8 +1,5 @@
-"use client"
-
-import axios from "axios";
-import { useEffect, useState } from "react";
-import { BrowserRouter, Route } from "react-router-dom";
+'use client'
+import { useState, useEffect } from "react";
 import Feed from "../../components/Feed";
 
 interface Article {
@@ -24,25 +21,13 @@ export default function MyFeed() {
     setPage(Math.max(1, Math.min(max_pages,page + x)));
   };
 
-  const getArticles = async (articles: number) => {
-    try {
-      const res = await axios.get(`http://192.168.1.155:4000/?articles=${articles}`);
-      setArticles(res.data);
-    } catch(error) {
-      console.log(error);
-    }
-  }
-
-  useEffect(() => {
-    getArticles(articles_to_get);
-  }, []);
   
   return (
     <>
-    {/* Holding header items */}
+    {/* Holding header items
     <div className="flex w-full border items-center justify-center sticky top-0 bg-orange-100 p-4">
       <h1 className="text-3xl font-semibold">Feed</h1>
-    </div>
+    </div> */}
 
     {/* Holding feed elements */}
     <div className="fixed items-center w-full bottom-10 top-10 my-10 overflow-y-scroll pb-4">
