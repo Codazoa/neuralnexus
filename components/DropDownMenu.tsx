@@ -10,7 +10,7 @@ import AuthCheck from '@/components/AuthCheck';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/myfeed', label: 'MyFeed' },
-  { href: '/preferences' , label: 'Preferences' },
+  { href: '/preferences/user' , label: 'Preferences' },
   { href: '/about', label: 'About' },
 ]
 
