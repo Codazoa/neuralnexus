@@ -1,3 +1,4 @@
+import DropDownMenu from "@/components/DropDownMenu";
 
 export default function Home() {  
   return (
