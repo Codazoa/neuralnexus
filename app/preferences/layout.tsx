@@ -17,23 +17,19 @@ export default async function Layout({ children }: { children: React.ReactNode }
   ];
 
   return (
-    <>
-      <div className='flex'>
-        <div className='flex flex-col min-h-screen md:flex-row flex-1'>
-          <aside className='w-full bg-gray-100 md:w-60'>
-            <nav>
-              <ul>
-                {menuItems.map(({ href, title }) => (
-                  <li className='m-2' key={title}>
-                    <Link href={href} className={`flex p-2 bg-orange-100 rounded hover:bg-orange-500 cursor-pointer`}>{title}</Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </aside>
-        </div>
-        <main className='flex-1'>{children}</main>
-      </div>
-    </>
+    <div className='flex'>
+        <aside className='w-full bg-gray-100 md:w-60 min-h-screen'>
+          <nav>
+            <ul>
+              {menuItems.map(({ href, title }) => (
+                <li className='m-2' key={title}>
+                  <Link href={href} className={`flex p-2 bg-orange-100 rounded hover:bg-orange-500 cursor-pointer`}>{title}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+      <main className='flex-auto'>{children}</main>
+    </div>
   );
 }
