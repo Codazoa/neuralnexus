@@ -48,6 +48,7 @@ model User {
   bio           String?
   accounts      Account[]
   sessions      Session[]
+  feeds         Feeds[]
 }
 
 model VerificationToken {
@@ -56,4 +57,11 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Feeds {
+  id        String      @id @default(cuid())
+  userId    String
+  feed_url  String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
