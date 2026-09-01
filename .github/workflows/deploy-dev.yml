@@ -5,6 +5,20 @@ on:
     branches: [dev]
   workflow_dispatch:
 
+# Secrets must be declared at job level. None are required — the build
+# always succeeds (envs are stubbed during `next build`). A missing
+# runtime secret just degrades that feature (e.g. sign-in without
+# GITHUB_ID/GITHUB_SECRET).
+#
+# To create: Settings -> Secrets and variables -> Actions -> New
+# repository secret. Copy the names from .github/secrets.example.txt.
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+  GITHUB_ID: ${{ secrets.GITHUB_ID }}
+  GITHUB_SECRET: ${{ secrets.GITHUB_SECRET }}
+  SHADOW_DATABASE_URL: ${{ secrets.SHADOW_DATABASE_URL }}
+
 jobs:
   build-and-serve:
     runs-on: [self-hosted, linux]
@@ -27,7 +41,13 @@ jobs:
             --restart unless-stopped \
             --network host \
             -e NEXT_TELEMETRY_DISABLED=1 \
+            -e DATABASE_URL="${DATABASE_URL}" \
+            -e NEXTAUTH_SECRET="${NEXTAUTH_SECRET}" \
+            -e GITHUB_ID="${GITHUB_ID}" \
+            -e GITHUB_SECRET="${GITHUB_SECRET}" \
+            -e SHADOW_DATABASE_URL="${SHADOW_DATABASE_URL}" \
             neuralnexus:dev
+          docker logs --tail 30 neuralnexus
 
       - name: Health check
         run: |
