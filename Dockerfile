@@ -1,23 +1,39 @@
 # Multi-stage build for NeuralNexus (Next.js 13 + Prisma 4)
 # Serves on 0.0.0.0:3000
 
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
+# Prisma 4's engine loader requires an OpenSSL version it can detect;
+# without libssl it defaults to the wrong engine variant at build time.
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-# prisma generate needs a schema; DATABASE_URL is only resolved at runtime
-ENV DATABASE_URL="postgresql://stub:***@localhost:5432/stub"
+# Build-time stubs: `next build` imports the NextAuth route and instantiates
+# GithubProvider, which throws if the envs are undefined at build time.
+# Real values are injected at runtime via `docker run -e ...` (see workflow).
+ENV DATABASE_URL="postgresql://stub:***@localhost:5432/stub" \
+    NEXTAUTH_SECRET="build-time-stub-secret-000000" \
+    GITHUB_ID="build-time-stub-client-id" \
+    GITHUB_SECRET="build-time-stub-client-secret"
+# prisma's postinstall is skipped by `npm ci` in some setups — generate
+# the client explicitly so page-data collection can import it.
+RUN npx prisma generate --schema prisma/schema.prisma
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
+# Runner needs the same OpenSSL the build stage detected, or the
+# generated Prisma query engine won't load at runtime.
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
