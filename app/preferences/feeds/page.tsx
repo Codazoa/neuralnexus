@@ -34,7 +34,7 @@ export default async function feedsPreference () {
       <div className='pt-4'>
         <p>Your feeds</p>
         {feed_list.map((item: FeedLinks, i: number) =>
-          <FeedDeleteForm item={item}/>
+          <FeedDeleteForm item={item} key={item.id} />
         )}
       </div>
     </div>

@@ -40,7 +40,7 @@ export default function MyFeed() {
       <div className="fixed items-center w-screen bottom-10 top-10 my-10 overflow-y-scroll pb-4 bg-gray-900">
         {articles.slice((page-1)*pages_to_show, ((page-1)*pages_to_show)+pages_to_show)
           .map((item:Article, i: number) =>
-            <div className='pb-1'>
+            <div className='pb-1' key={item.link || i}>
               <Feed
                 key={i}
                 title={item.title}
