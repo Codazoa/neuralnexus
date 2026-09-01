@@ -1,0 +1,45 @@
+name: Deploy dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  build-and-serve:
+    runs-on: [self-hosted, linux]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -t neuralnexus:dev .
+
+      - name: Kill previous container
+        run: |
+          docker rm -f neuralnexus || true
+
+      - name: Run
+        run: |
+          docker run -d \
+            --name neuralnexus \
+            --restart unless-stopped \
+            --network host \
+            -e NEXT_TELEMETRY_DISABLED=1 \
+            neuralnexus:dev
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 90); do
+            if docker inspect -f '{{.State.Running}}' neuralnexus 2>/dev/null | grep -q true \
+               && curl -fsSL http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              echo "healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "--- container state ---"
+          docker inspect -f '{{.State.Status}} {{.State.Error}}' neuralnexus || true
+          echo "--- container logs ---"
+          docker logs --tail 200 neuralnexus || true
+          exit 1
