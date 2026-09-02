@@ -10,57 +10,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Account {
-  id                       String  @id @default(cuid())
-  userId                   String
-  type                     String
-  provider                 String
-  providerAccountId        String
-  refresh_token            String?
-  access_token             String?
-  expires_at               Int?
-  token_type               String?
-  scope                    String?
-  id_token                 String?
-  session_state            String?
-  refresh_token_expires_in Int?
-  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
+// Single local user (this app lives on one device, one person).
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  age           Int?
-  bio           String?
-  accounts      Account[]
-  sessions      Session[]
-  feeds         Feeds[]
+  id        String    @id @default(cuid())
+  name      String?
+  age       Int?
+  bio       String?
+  image     String?
+  createdAt DateTime  @default(now())
+  apiKey    ApiKey?
+  feeds     Feeds[]
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
+// A locally-generated private key. The raw key only ever exists on the
+// device; the server stores its SHA-256 hash. First key ever registered
+// on this database becomes the user's key (registration happens on
+// first unlock, no sign-up step).
+model ApiKey {
+  id         String    @id @default(cuid())
+  keyHash    String    @unique
+  label      String    @default("device-key")
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Feeds {
-  id        String      @id @default(cuid())
-  userId    String
-  feed_url  String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  userId   String
+  feed_url String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

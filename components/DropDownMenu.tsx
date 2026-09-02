@@ -4,13 +4,11 @@ import { Menu, Transition } from '@headlessui/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Fragment } from 'react';
-import { SignInButton, SignOutButton } from './buttons';
-import AuthCheck from '@/components/AuthCheck';
 
 const links = [
   { href: '/', label: 'Home' },
   { href: '/myfeed', label: 'MyFeed' },
-  { href: '/preferences/user' , label: 'Preferences' },
+  { href: '/preferences/feeds', label: 'Feeds' },
   { href: '/about', label: 'About' },
 ]
 
@@ -50,18 +48,6 @@ export default function DropDownMenu() {
                 )}
               </Menu.Item>
             ))}
-          </div>
-          <div className='py-1'>
-            <Menu.Item as='button'>
-            {({ active }) => (
-              <div className={`block px-4 py-2 text-sm ${ active ? 'bg-blue-500 text-white' : 'bg-white text-black'}`}>
-                <SignInButton />
-                <AuthCheck>
-                  <SignOutButton />
-                </AuthCheck>
-              </div>
-            )}
-            </Menu.Item>
           </div>
         </Menu.Items>
       </Transition>

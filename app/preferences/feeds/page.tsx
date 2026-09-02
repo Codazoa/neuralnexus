@@ -1,7 +1,7 @@
-import { FeedDeleteForm, FeedUrlForm } from "@/components/FeedPicker";
-import { getServerSession } from 'next-auth';
+import KeyGate from '@/components/KeyGate';
 import { prisma } from '@/lib/prisma';
-import { authOptions } from "../../api/auth/[...nextauth]/route"
+import { getCurrentUser } from '@/lib/key';
+import { FeedDeleteForm, FeedUrlForm } from '@/components/FeedPicker';
 
 interface FeedLinks {
   id: string;
@@ -9,34 +9,35 @@ interface FeedLinks {
   feed_url: string;
 }
 
-export default async function feedsPreference () {
-  const session = await getServerSession(authOptions);
-
-  const currentUserEmail = session?.user?.email!;
-  const user = await prisma.user.findUnique({
-    where: {
-      email: currentUserEmail,
-    }
-  });
-
-  const feed_list_promise = prisma.feeds.findMany({
-    where: {
-      userId: user?.id
-    }
-  });
-
-  const feed_list = await feed_list_promise;
+// /preferences/feeds — manage the device's RSS feeds, behind the key gate.
+export default async function FeedsPreference() {
+  const user = await getCurrentUser();
 
   return (
-    <div className='bg-gray-400 p-4'>
-      <h1 className='text-2xl font-bold'>Feeds</h1>
-      <FeedUrlForm user={user} />
-      <div className='pt-4'>
-        <p>Your feeds</p>
-        {feed_list.map((item: FeedLinks, i: number) =>
-          <FeedDeleteForm item={item} key={item.id} />
-        )}
-      </div>
-    </div>
+    <KeyGate>
+      {user && (
+        <div className="bg-gray-400 p-4">
+          <h1 className="text-2xl font-bold">Feeds</h1>
+          <FeedUrlForm />
+          <div className="pt-4">
+            <p>Your feeds</p>
+            {user && (
+              <FeedList userId={user.id} />
+            )}
+          </div>
+        </div>
+      )}
+    </KeyGate>
+  );
+}
+
+async function FeedList({ userId }: { userId: string }) {
+  const feed_list = await prisma.feeds.findMany({ where: { userId } });
+  return (
+    <>
+      {feed_list.map((item: FeedLinks) => (
+        <FeedDeleteForm item={item} key={item.id} />
+      ))}
+    </>
   );
 }

@@ -1,81 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
-import { authOptions } from "../auth/[...nextauth]/route"
+import { requireUser } from '@/lib/key';
 
-// add a new feed for a user
-export async function PUT(request: Request) {
-  
-  // user validation
-  const session = await getServerSession(authOptions);
-  const currentUserEmail = session?.user?.email!;
-
-  const data = await request.json();
-
-  const user = await prisma.user.findUnique({
-    where: { email: currentUserEmail }
-  });
-
+// PUT /api/feeds  — add a new RSS feed for the (sole local) user.
+// NOTE: method stays PUT to match the existing client-side form.
+export async function PUT(request: NextRequest) {
+  const user = await requireUser(request);
   if (!user) {
-    return NextResponse.json({error: 'No user found'}, { status: 404})
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  // check if feed exists already
-  const checkFeed = await prisma.feeds.findMany({
-    where: { 
-      userId: user.id,
-      feed_url: data.url,
-    }
-  });
-
-  if (checkFeed.length != 0) {
-    return NextResponse.json({error: 'Duplicate Feed url'});
+  let data: { url?: string } = {};
+  try {
+    data = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // creating the new feed entry
-  const newFeed = await prisma.feeds.create({
-    data: {
-      userId: user.id,
-      feed_url: data.url
-    }
-  });
+  const feedUrl = (data.url || '').trim();
+  if (!feedUrl) {
+    return NextResponse.json({ error: 'Feed url is required' }, { status: 400 });
+  }
 
-  return NextResponse.json(newFeed);
+  const existing = await prisma.feeds.findFirst({
+    where: { userId: user.id, feed_url: feedUrl },
+  });
+  if (existing) {
+    return NextResponse.json({ error: 'Duplicate feed url' }, { status: 409 });
+  }
+
+  const feed = await prisma.feeds.create({
+    data: { userId: user.id, feed_url: feedUrl },
+  });
+  return NextResponse.json(feed, { status: 201 });
 }
 
-// get all the feeds for a particular user
-export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  const currentUserEmail = session?.user?.email!;
-
-  const data = await request.json();
-
-  const user = await prisma.user.findUnique({
-    where: {email: currentUserEmail}
-  });
-
+// GET /api/feeds  — list the user's feeds.
+export async function GET(request: NextRequest) {
+  const user = await requireUser(request);
   if (!user) {
-    return NextResponse.json({error: 'No user found'}, { status: 404})
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const feed_list = await prisma.feeds.findMany({
-    where: {
-      userId: user.id
-    }
-  });
-
-  return NextResponse.json(feed_list);
+  const feeds = await prisma.feeds.findMany({ where: { userId: user.id } });
+  return NextResponse.json(feeds);
 }
 
-// delete a feed from user account
+// DELETE /api/feeds?feedId=...  — remove a feed.
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const currentUserEmail = session?.user?.email!;
-  const targetFeedId = request.nextUrl.searchParams.get('feedId');
+  const user = await requireUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
 
-  const delFeed = await prisma.feeds.delete({
-    where: {
-      id: targetFeedId!
-    }
+  const feedId = request.nextUrl.searchParams.get('feedId');
+  if (!feedId) {
+    return NextResponse.json({ error: 'feedId query param is required' }, { status: 400 });
+  }
+
+  // Only the owner can delete their own feed.
+  const deleted = await prisma.feeds.deleteMany({
+    where: { id: feedId, userId: user.id },
   });
+  if (deleted.count === 0) {
+    return NextResponse.json({ error: 'Feed not found' }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
 }

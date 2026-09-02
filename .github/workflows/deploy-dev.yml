@@ -5,16 +5,11 @@ on:
     branches: [dev]
   workflow_dispatch:
 
-# Secrets: none are *required* for the build (NextAuth envs are stubbed
-# during `next build`). Missing a runtime secret degrades that feature
-# (sign-in won't work without GITHUB_ID/GITHUB_SECRET/NEXTAUTH_SECRET).
-#
-# To create: Settings -> Secrets and variables -> Actions -> repository
-# secrets. Names: see .github/secrets.example.txt.
+# No repo secrets are required anymore — sign-in is the local private
+# key and the key itself is never stored server-side. See
+# .github/secrets.example.txt (optional-only) for the one optional env.
 env:
-  NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-  GITHUB_ID: ${{ secrets.GITHUB_ID }}
-  GITHUB_SECRET: ${{ secrets.GITHUB_SECRET }}
+  NN_COOKIE_INSECURE: "1"
 
 jobs:
   build-and-serve:
@@ -46,9 +41,7 @@ jobs:
             --network host \
             -e NEXT_TELEMETRY_DISABLED=1 \
             -e DATABASE_URL="file:/data/dev.db" \
-            -e NEXTAUTH_SECRET="${NEXTAUTH_SECRET}" \
-            -e GITHUB_ID="${GITHUB_ID}" \
-            -e GITHUB_SECRET="${GITHUB_SECRET}" \
+            -e NN_COOKIE_INSECURE="1" \
             -v nn-sqlite:/data \
             neuralnexus:dev
           docker logs --tail 30 neuralnexus
@@ -60,15 +53,7 @@ jobs:
                && curl -fsSL http://127.0.0.1:3000/ >/dev/null 2>&1; then
               echo "web: healthy"
               # Verify the SQLite schema is queryable inside the container.
-              db_check=$(cat <<'NODE'
-              const {PrismaClient}=require("@prisma/client");
-              const p=new PrismaClient({datasources:{db:{url:"file:/data/dev.db"}}});
-              p.\$queryRaw("select count(1) as n from sqlite_master where type='table'")
-               .then(r=>{console.log("sqlite tables:",r[0].n);return p.\$disconnect()})
-               .catch(e=>{console.error("db failed:",e.message);process.exit(1)});
-              NODE
-              )
-              printf '%s\n' "$db_check" | docker exec -i neuralnexus node
+              printf '%s\n' 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient({datasources:{db:{url:"file:/data/dev.db"}}});p.$queryRaw("select count(1) as n from sqlite_master where type='"'"'table'"'"'").then(r=>{console.log("sqlite tables:",r[0].n);process.exit(0)}).catch(e=>{console.error("db failed:",e.message);process.exit(1)});' | docker exec -i neuralnexus node
               echo "healthy"
               exit 0
             fi
