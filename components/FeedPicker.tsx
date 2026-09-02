@@ -29,13 +29,17 @@ export function FeedUrlForm({ user }: any) {
   return (
     <div className="nn-surface nn-border rounded-xl p-4 sm:p-5">
       <h2 className="nn-text text-lg font-semibold">Add a feed</h2>
+      <p className="nn-mut mt-1 text-xs">
+        Paste an RSS/Atom feed URL — or a YouTube channel link (e.g.
+        <span className="nn-mut"> youtube.com/@handle</span>) and we&apos;ll find its feed.
+      </p>
       <form onSubmit={addFeed} className="mt-3 flex flex-col gap-2 sm:flex-row">
         <input
           className="nn-input order-2 sm:order-1 sm:flex-1"
           type="text"
           name="feed url"
           defaultValue="https://example.com/feed.rss"
-          placeholder="https://example.com/feed.rss"
+          placeholder="https://example.com/feed.rss  or  https://www.youtube.com/@YourChannel"
           aria-label="Feed URL"
         />
         <button className="nn-btn nn-btn-primary order-1 sm:order-2" type="submit">
