@@ -18,9 +18,12 @@ export default function MyFeed() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Ceil (not floor) so a partial last page is reachable: with 11–19 items a
+  // floor would collapse max_pages to 1 and leave items 11+ hidden behind a
+  // disabled Next/Last. Clamp to 1 when empty.
   const max_pages = Math.max(
     1,
-    Math.floor(Math.min(ARTICLES_TO_GET, articles.length) / PAGES_TO_SHOW)
+    Math.ceil(Math.min(ARTICLES_TO_GET, articles.length) / PAGES_TO_SHOW)
   );
 
   const changePage = (x: number) => {
