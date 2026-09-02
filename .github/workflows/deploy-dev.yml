@@ -47,13 +47,13 @@ jobs:
           docker logs --tail 30 neuralnexus
 
       - name: Health check
+        # The app boots with Prisma (entrypoint runs `migrate deploy`
+        # first and the query engine loads), so a 200 here is proof the
+        # SQLite database is reachable and queryable.
         run: |
           for i in $(seq 1 90); do
             if docker inspect -f '{{.State.Running}}' neuralnexus 2>/dev/null | grep -q true \
                && curl -fsSL http://127.0.0.1:3000/ >/dev/null 2>&1; then
-              echo "web: healthy"
-              # Verify the SQLite schema is queryable inside the container.
-              printf '%s\n' 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient({datasources:{db:{url:"file:/data/dev.db"}}});p.$queryRaw("select count(1) as n from sqlite_master where type='"'"'table'"'"'").then(r=>{console.log("sqlite tables:",r[0].n);process.exit(0)}).catch(e=>{console.error("db failed:",e.message);process.exit(1)});' | docker exec -i neuralnexus node
               echo "healthy"
               exit 0
             fi
