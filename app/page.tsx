@@ -4,12 +4,19 @@ import KeyGate from '@/components/KeyGate';
 // see the private-key unlock panel instead.
 export default function Home() {
   return (
-    <KeyGate>
-      <div className="mx-auto max-w-3xl p-6">
-        <p className="text-lg">Welcome to NeuralNexus — the everything feed.</p>
-        <p className="mt-2 text-sm text-neutral-600">
-          Add RSS feeds under the menu → Feeds, then read them all here.
-          Everything is stored locally on this device.
+    <KeyGate withKeyBar={false}>
+      <div className="nn-bg mx-auto max-w-3xl px-4 py-8 sm:py-12">
+        <h1 className="nn-text text-3xl font-bold tracking-tight">
+          Welcome to {' '}
+          <span className="nn-accent">Neural</span>Nexus
+        </h1>
+        <p className="nn-mut mt-3 leading-relaxed">
+          The local everything-feed. Add your RSS feeds under
+          {' '}
+          <a href="/preferences/feeds" className="nn-accent font-medium underline">
+            Feeds
+          </a>{' '}
+          and read them all in one place, in any theme, on any device.
         </p>
       </div>
     </KeyGate>

@@ -24,28 +24,29 @@ export default function KeyBar() {
     setBusy(true);
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/';
     } catch {
       // ignore
-      window.location.href = '/';
     } finally {
       setBusy(false);
     }
+    window.location.href = '/';
   };
 
   return (
-    <div className="mt-3 flex items-center justify-between rounded-md bg-neutral-100 px-3 py-2 text-xs text-neutral-600 ring-1 ring-black/5">
-      <span>
-        Device key:{' '}
-        <span className="font-mono">{masked || 'nnx_…'}</span>
-      </span>
-      <button
-        onClick={lock}
-        disabled={busy}
-        className="rounded bg-white px-2 py-1 font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
-      >
-        {busy ? 'Locking…' : 'Lock'}
-      </button>
+    <div className="mx-auto mt-4 max-w-3xl px-4 sm:mt-5">
+      <div className="nn-surface-2 nn-border flex items-center justify-between rounded-r-lg px-3 py-2 text-xs">
+        <span className="nn-mut">
+          Device key:{' '}
+          <span className="nn-text font-mono">{masked || 'nnx_…'}</span>
+        </span>
+        <button
+          onClick={lock}
+          disabled={busy}
+          className="nn-btn nn-btn-ghost !px-3 !py-1.5 !text-xs"
+        >
+          {busy ? 'Locking…' : 'Lock'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -16,24 +16,21 @@ export default async function PreferencesLayout({
 
   return (
     <KeyGate withKeyBar={false}>
-      <div className="flex">
-        <aside className="w-full bg-gray-100 md:w-60 min-h-[70vh]">
-          <nav>
-            <ul>
-              {menuItems.map(({ href, title }) => (
-                <li className="m-2" key={title}>
-                  <Link
-                    href={href}
-                    className="flex p-2 bg-orange-100 rounded hover:bg-orange-500 cursor-pointer"
-                  >
-                    {title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+      <div className="nn-bg mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:flex-row sm:py-8">
+        <aside className="nn-surface-2 nn-border w-full rounded-xl border p-2 sm:w-56">
+          <nav className="space-y-1" aria-label="Preferences">
+            {menuItems.map(({ href, title }) => (
+              <Link
+                key={title}
+                href={href}
+                className="nn-link block rounded-lg px-3 py-2.5 text-sm font-medium"
+              >
+                {title}
+              </Link>
+            ))}
           </nav>
         </aside>
-        <main className="flex-auto">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </KeyGate>
   );

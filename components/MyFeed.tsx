@@ -43,68 +43,77 @@ export default function MyFeed() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
     getArticles();
   }, []);
 
+  const pageButton =
+    'nn-btn nn-btn-ghost !px-3.5 !py-2 disabled:cursor-not-allowed';
+
   return (
-    <div className="bg-gray-600">
-      <div className="mx-auto max-w-3xl my-8 overflow-y-scroll bg-gray-900 px-2 py-6">
-        <div className="flex items-baseline justify-between px-2">
-          <h1 className="text-2xl font-bold text-white">My Feed</h1>
-          {loading && <span className="text-sm text-gray-400">loading…</span>}
+    <div className="nn-bg min-h-[70vh]">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8">
+        <div className="nn-mut flex items-baseline justify-between">
+          <h1 className="nn-text text-2xl font-bold tracking-tight sm:text-3xl">
+            My Feed
+          </h1>
+          {loading && <span className="text-sm">loading…</span>}
         </div>
 
-        {error && <p className="mt-4 px-2 text-red-300">{error}</p>}
+        <div className="mt-5 space-y-3">
+          {error && (
+            <p className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
+              {error}
+            </p>
+          )}
 
-        {!loading && articles.length === 0 && !error && (
-          <p className="mt-4 px-2 text-gray-400">
-            No feeds yet — add one from the menu → Feeds.
-          </p>
-        )}
+          {!loading && articles.length === 0 && !error && (
+            <p className="nn-surface-2 nn-border rounded-lg px-4 py-6 text-center text-sm">
+              <span className="nn-mut">
+                No feeds yet — add one from the menu → Feeds.
+              </span>
+            </p>
+          )}
 
-        {articles
-          .slice((page - 1) * PAGES_TO_SHOW, page * PAGES_TO_SHOW)
-          .map((item, i) => (
-            <div className="pb-1" key={item.link || i}>
+          {articles
+            .slice((page - 1) * PAGES_TO_SHOW, page * PAGES_TO_SHOW)
+            .map((item, i) => (
               <Feed
-                key={i}
+                key={item.link || i}
                 title={item.title || '(untitled)'}
                 link={item.link || '#'}
                 date={item.pubDate ? new Date(item.pubDate) : new Date(0)}
               />
-            </div>
-          ))}
-      </div>
+            ))}
+        </div>
 
-      <div className="mx-auto flex max-w-3xl items-center justify-center gap-3 py-6">
-        <button
-          className="bg-orange-600 rounded px-4 py-2 text-white hover:bg-orange-700"
-          onClick={() => setPage(1)}
-        >
-          First
-        </button>
-        <button
-          className="bg-orange-600 rounded px-4 py-2 text-white hover:bg-orange-700"
-          onClick={() => changePage(-1)}
-        >
-          Prev
-        </button>
-        <h3 className="text-3xl font-bold text-white">{page}</h3>
-        <button
-          className="bg-orange-600 rounded px-4 py-2 text-white hover:bg-orange-700"
-          onClick={() => changePage(1)}
-        >
-          Next
-        </button>
-        <button
-          className="bg-orange-600 rounded px-4 py-2 text-white hover:bg-orange-700"
-          onClick={() => setPage(max_pages)}
-        >
-          Last
-        </button>
+        <div className="mt-8 flex items-center justify-center gap-2 sm:gap-3">
+          <button className={pageButton} onClick={() => setPage(1)}>
+            First
+          </button>
+          <button
+            className={pageButton}
+            onClick={() => changePage(-1)}
+            disabled={page <= 1}
+          >
+            Prev
+          </button>
+          <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
+            {page}
+          </span>
+          <button
+            className={pageButton}
+            onClick={() => changePage(1)}
+            disabled={page >= max_pages}
+          >
+            Next
+          </button>
+          <button className={pageButton} onClick={() => setPage(max_pages)}>
+            Last
+          </button>
+        </div>
       </div>
     </div>
   );
