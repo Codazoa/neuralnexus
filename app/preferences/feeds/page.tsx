@@ -14,16 +14,25 @@ export default async function FeedsPreference() {
   const user = await getCurrentUser();
 
   return (
-    <KeyGate>
+    <KeyGate withKeyBar={false}>
       {user && (
-        <div className="bg-gray-400 p-4">
-          <h1 className="text-2xl font-bold">Feeds</h1>
-          <FeedUrlForm />
-          <div className="pt-4">
-            <p>Your feeds</p>
-            {user && (
-              <FeedList userId={user.id} />
-            )}
+        <div>
+          <h1 className="nn-text text-2xl font-bold tracking-tight">Feeds</h1>
+          <p className="nn-mut mt-1 text-sm">
+            Add or remove the RSS feeds that make up your everything feed.
+          </p>
+
+          <div className="mt-5">
+            <FeedUrlForm />
+          </div>
+
+          <div className="mt-6">
+            <h2 className="nn-mut text-sm font-semibold uppercase tracking-wide">
+              Your feeds
+            </h2>
+            <div className="mt-3 space-y-2">
+              {user && <FeedList userId={user.id} />}
+            </div>
           </div>
         </div>
       )}
@@ -38,6 +47,9 @@ async function FeedList({ userId }: { userId: string }) {
       {feed_list.map((item: FeedLinks) => (
         <FeedDeleteForm item={item} key={item.id} />
       ))}
+      {feed_list.length === 0 && (
+        <p className="nn-mut text-sm">No feeds yet.</p>
+      )}
     </>
   );
 }

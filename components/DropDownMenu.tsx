@@ -7,7 +7,7 @@ import { Fragment } from 'react';
 
 const links = [
   { href: '/', label: 'Home' },
-  { href: '/myfeed', label: 'MyFeed' },
+  { href: '/myfeed', label: 'My Feed' },
   { href: '/preferences/feeds', label: 'Feeds' },
   { href: '/about', label: 'About' },
 ]
@@ -16,12 +16,13 @@ export default function DropDownMenu() {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
-        <Menu.Button className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+        <Menu.Button className="inline-flex items-center justify-center rounded-md ring-1 nn-surface nn-ring px-2.5 py-2 shadow-sm transition hover:opacity-90">
           <Image
             src="/artificial-intelligence.png"
-            width={50}
-            height={30}
-            alt="NeuralNexus Logo" 
+            width={44}
+            height={28}
+            alt="NeuralNexus menu"
+            className="rounded"
           />
         </Menu.Button>
       </div>
@@ -35,12 +36,17 @@ export default function DropDownMenu() {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <Menu.Items className="absolute right-0 z-30 mt-2 w-52 origin-top-right nn-surface rounded-lg border nn-border shadow-xl">
           <div className="py-1">
             {links.map((link) => (
               <Menu.Item key={link.href} as={Fragment}>
                 {({ active }) => (
-                  <Link className={`block px-4 py-2 text-sm ${ active ? 'bg-blue-500 text-white': 'bg-white text-black'}`}
+                  <Link
+                    className={`block rounded-md px-4 py-2 text-sm transition ${
+                      active
+                        ? 'nn-accent-soft font-medium'
+                        : 'nn-mut'
+                    }`}
                     href={link.href}
                   >
                     {link.label}

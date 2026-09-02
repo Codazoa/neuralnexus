@@ -2,8 +2,159 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Design tokens — issue #11
+  Light: off-white surfaces, blue accent.
+  Dark:  deep charcoal surfaces, purple accent.
+  The <html data-theme> attribute (set by the ThemeProvider before first
+  paint and kept in sync with window state) switches the palette.
+*/
+:root,
+[data-theme='light'] {
+  --nn-bg: #f4f6fa;
+  --nn-surface: #ffffff;
+  --nn-surface-2: #eef2fb;
+  --nn-border: #dbe2f0;
+  --nn-text: #0f172a;
+  --nn-text-muted: #49556b;
+  --nn-accent: #2563eb;
+  --nn-accent-strong: #1d4ed8;
+  --nn-on-accent: #ffffff;
+  --nn-shadow: 30 41 59;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --nn-bg: #0d0a16;
+  --nn-surface: #181329;
+  --nn-surface-2: #221b3e;
+  --nn-border: #342b5e;
+  --nn-text: #ece8fb;
+  --nn-text-muted: #b3a8dd;
+  --nn-accent: #a78bfa;
+  --nn-accent-strong: #8b5cf6;
+  --nn-on-accent: #150f2b;
+  --nn-shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+html {
+  background-color: var(--nn-bg);
+}
+
 body {
   font-family: sans-serif;
-  letter-spacing: 0.5px;
-  background: #ffffef;
+  letter-spacing: 0.02em;
+  background-color: var(--nn-bg);
+  color: var(--nn-text);
+  min-height: 100vh;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--nn-accent) 35%, transparent);
+}
+
+@layer components {
+  /* Neutral theme-aware surfaces ------------------------------------------------ */
+  .nn-bg { background-color: var(--nn-bg); }
+  .nn-surface { background-color: var(--nn-surface); }
+  .nn-surface-2 { background-color: var(--nn-surface-2); }
+  .nn-border { border-color: var(--nn-border); }
+  .nn-ring { --tw-ring-color: color-mix(in srgb, var(--nn-border) 100%, transparent); }
+
+  /* Text ----------------------------------------------------------------------- */
+  .nn-text { color: var(--nn-text); }
+  .nn-mut { color: var(--nn-text-muted); }
+
+  /* Accent --------------------------------------------------------------------- */
+  .nn-accent { color: var(--nn-accent); }
+  .nn-accent-bg { background-color: var(--nn-accent); color: var(--nn-on-accent); }
+  .nn-accent-soft {
+    background-color: color-mix(in srgb, var(--nn-accent) 12%, transparent);
+    color: var(--nn-accent);
+  }
+  .nn-accent-softer {
+    background-color: color-mix(in srgb, var(--nn-accent) 7%, transparent);
+  }
+
+  /* Cards / inputs / buttons ----------------------------------------------------- */
+  .nn-card {
+    background-color: var(--nn-surface);
+    color: var(--nn-text);
+    border: 1px solid var(--nn-border);
+    border-radius: 0.85rem;
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--nn-shadow) 6%, transparent);
+  }
+  .nn-chip {
+    background-color: var(--nn-surface-2);
+    color: var(--nn-text);
+    border: 1px solid var(--nn-border);
+    border-radius: 0.6rem;
+  }
+  .nn-input {
+    width: 100%;
+    background-color: var(--nn-surface);
+    color: var(--nn-text);
+    border: 1px solid var(--nn-border);
+    border-radius: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.875rem;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .nn-input::placeholder { color: var(--nn-text-muted); }
+  .nn-input:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--nn-accent) 60%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--nn-accent) 22%, transparent);
+  }
+  .nn-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.6rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease,
+      border-color 120ms ease, transform 80ms ease;
+  }
+  .nn-btn:active { transform: translateY(1px); }
+  .nn-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .nn-btn-primary {
+    background-color: var(--nn-accent);
+    color: var(--nn-on-accent);
+  }
+  .nn-btn-primary:hover { background-color: var(--nn-accent-strong); }
+  .nn-btn-ghost {
+    background-color: transparent;
+    color: var(--nn-text);
+    border: 1px solid var(--nn-border);
+  }
+  .nn-btn-ghost:hover {
+    background-color: color-mix(in srgb, var(--nn-accent) 10%, transparent);
+    color: var(--nn-accent);
+    border-color: color-mix(in srgb, var(--nn-accent) 45%, transparent);
+  }
+
+  /* Themed hover affordances (kept in CSS because `.nn-*` is a component
+     class, so Tailwind can't emit `hover:` variants for it). */
+  .nn-link {
+    color: var(--nn-text-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .nn-link:hover {
+    background-color: color-mix(in srgb, var(--nn-accent) 10%, transparent);
+    color: var(--nn-accent);
+  }
+  .nn-surface {
+    transition: background-color 160ms ease, color 160ms ease,
+      border-color 160ms ease;
+  }
 }

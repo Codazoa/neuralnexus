@@ -25,17 +25,22 @@ export function FeedUrlForm({ user }: any) {
     const data = await res.json();
     router.refresh();
   };
-  
+
   return (
-    <div>
-      <h2>Add a feed</h2>
-      <form onSubmit={addFeed}>
-        <div className='flex'>
-          <div className='pr-2'>
-            <button className="px-4 rounded border bg-gray-300 hover:bg-blue-300" type="submit">Add Feed</button>
-          </div>
-          <input className='border rounded px-4 w-96' type='text' name='feed url' defaultValue='https://example.com/feed.rss' />
-        </div>
+    <div className="nn-surface nn-border rounded-xl p-4 sm:p-5">
+      <h2 className="nn-text text-lg font-semibold">Add a feed</h2>
+      <form onSubmit={addFeed} className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input
+          className="nn-input order-2 sm:order-1 sm:flex-1"
+          type="text"
+          name="feed url"
+          defaultValue="https://example.com/feed.rss"
+          placeholder="https://example.com/feed.rss"
+          aria-label="Feed URL"
+        />
+        <button className="nn-btn nn-btn-primary order-1 sm:order-2" type="submit">
+          Add Feed
+        </button>
       </form>
     </div>
   );
@@ -45,22 +50,22 @@ export function FeedDeleteForm({ item }: any) {
   const router = useRouter();
 
   const delFeed = async () => {
-    const res = await fetch(`/api/feeds?feedId=${item.id}`, {
+    await fetch(`/api/feeds?feedId=${item.id}`, {
       method: 'DELETE'
-    })
+    });
 
     router.refresh();
-  }
-
-
+  };
 
   return (
-    <div className='flex py-2'>
-      <div className='pr-2'>
-        <button className="rounded px-4 bg-gray-300"
-          onClick={delFeed}>Delete</button>
-      </div>
-      <p className='bg-white rounded px-4'>{item.feed_url}</p>
+    <div className="nn-surface nn-border flex items-center justify-between gap-3 rounded-lg px-3 py-2.5">
+      <p className="nn-mut min-w-0 flex-1 truncate text-sm">{item.feed_url}</p>
+      <button
+        className="nn-btn nn-btn-ghost shrink-0 !px-3 !py-1.5 !text-xs"
+        onClick={delFeed}
+      >
+        Delete
+      </button>
     </div>
   );
 }

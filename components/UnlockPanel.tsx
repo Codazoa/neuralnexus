@@ -128,93 +128,113 @@ export default function UnlockPanel() {
 
   if (!stateKnown) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </div>
+      <main className="nn-bg mx-auto flex min-h-[75vh] max-w-3xl flex-col items-center justify-center px-6">
+        <span className="nn-mut text-sm" aria-live="polite">
+          Loading…
+        </span>
+      </main>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
+    <main className="nn-bg mx-auto flex min-h-[75vh] max-w-3xl flex-col items-center justify-center px-4 py-8 sm:px-6">
       <form
         onSubmit={unlock}
-        className="w-full max-w-xl rounded-xl bg-white p-8 shadow-lg ring-1 ring-black/5"
+        className="nn-surface nn-border w-full max-w-xl rounded-2xl border p-6 shadow-lg sm:p-8"
       >
-        <h1 className="text-2xl font-bold">Unlock NeuralNexus</h1>
-        <p className="mt-1 text-sm text-neutral-600">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--nn-accent)_14%,transparent)] text-lg">
+          <span className="nn-accent font-black">N</span>
+        </div>
+
+        <h1 className="nn-text text-center text-2xl font-bold tracking-tight">
+          Unlock NeuralNexus
+        </h1>
+        <p className="nn-mut mt-1 text-center text-sm">
           Sign in with your private key. No passwords, no accounts — one key,
           every device.
         </p>
 
-        {isOwnerMode && (
-          <>
-            <div className="mt-4 rounded-md bg-yellow-50 p-3 text-sm ring-1 ring-yellow-200">
-              <strong className="font-semibold">
-                First run: this is your private key.
-              </strong>{' '}
-              Save it now — it is shown once, and it unlocks the app on any
-              device (phone, laptop, tablet) as long as they point at the same
-              database.
-              <div className="mt-2 flex items-start gap-2">
-                <div className="min-w-0 flex-1 select-all break-all bg-white p-2 font-mono text-xs ring-1 ring-yellow-200">
-                  {key}
+            {isOwnerMode && (
+              <>
+                <div className="nn-surface-2 nn-border mt-5 rounded-r-lg border p-3 text-sm">
+                  <strong className="nn-text font-semibold">
+                    First run: this is your private key.
+                  </strong>{' '}
+                  <span className="nn-mut">
+                    Save it now — it is shown once, and it unlocks the app on
+                    any device (phone, laptop, tablet) as long as they point
+                    at the same database.
+                  </span>
+                  <div className="nn-surface nn-border mt-2.5 flex items-stretch gap-2 rounded-md border">
+                    <div className="nn-text min-w-0 flex-1 select-all break-all p-2 font-mono text-xs">
+                      {key}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={copyKey}
+                      className="nn-accent-soft shrink-0 rounded-r-md px-3 text-xs font-semibold"
+                    >
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={copyKey}
-                  className="shrink-0 rounded-md bg-white px-3 py-2 text-xs font-semibold ring-1 ring-yellow-300 hover:bg-yellow-50"
-                >
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-            <label className="mt-4 block text-sm font-medium">
-              Private key
-            </label>
-            <input
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 p-2 font-mono text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-              spellCheck={false}
-              autoComplete="off"
-              aria-label="Your private key"
-            />
-          </>
-        )}
+                <label className="nn-text mt-4 block text-sm font-medium">
+                  Private key
+                </label>
+                <input
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  className="nn-input nn-text mt-1.5 font-mono"
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-label="Your private key"
+                />
+              </>
+            )}
 
-        {!isOwnerMode && (
-          <>
-            <label className="mt-4 block text-sm font-medium">Private key</label>
-            <input
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 p-2 font-mono text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-              placeholder="nnx_…"
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <p className="mt-2 text-xs text-neutral-500">
-              This is the key that was shown on the first device that set up
-              this database. If you are setting up a new device, enter that
-              key here — do not generate a new one.
-            </p>
-          </>
-        )}
+            {!isOwnerMode && (
+              <>
+                <label className="nn-text mt-4 block text-sm font-medium">
+                  Private key
+                </label>
+                <input
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  className="nn-input nn-text mt-1.5 font-mono"
+                  placeholder="nnx_…"
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-label="Your private key"
+                />
+                <p className="nn-mut mt-2 text-xs leading-relaxed">
+                  This is the key that was shown on the first device that set
+                  up this database. If you are setting up a new device, enter
+                  that key here — do not generate a new one.
+                </p>
+              </>
+            )}
 
-        {error && (
-          <p className="mt-2 text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        )}
+            {error && (
+              <p
+                className="mt-3 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-300"
+                role="alert"
+              >
+                {error}
+              </p>
+            )}
 
-        <button
-          type="submit"
-          disabled={busy || !key.trim()}
-          className="mt-4 w-full rounded-md bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy ? 'Unlocking…' : isOwnerMode ? 'Save key & unlock' : 'Unlock'}
-        </button>
+            <button
+              type="submit"
+              disabled={busy || !key.trim()}
+              className="nn-btn nn-btn-primary mt-5 w-full !py-2.5"
+            >
+              {busy
+                ? 'Unlocking…'
+                : isOwnerMode
+                  ? 'Save key & unlock'
+                  : 'Unlock'}
+            </button>
       </form>
-    </div>
+    </main>
   );
 }
