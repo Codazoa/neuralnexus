@@ -5,19 +5,16 @@ on:
     branches: [dev]
   workflow_dispatch:
 
-# Secrets must be declared at job level. None are required — the build
-# always succeeds (envs are stubbed during `next build`). A missing
-# runtime secret just degrades that feature (e.g. sign-in without
-# GITHUB_ID/GITHUB_SECRET).
+# Secrets: none are *required* for the build (NextAuth envs are stubbed
+# during `next build`). Missing a runtime secret degrades that feature
+# (sign-in won't work without GITHUB_ID/GITHUB_SECRET/NEXTAUTH_SECRET).
 #
-# To create: Settings -> Secrets and variables -> Actions -> New
-# repository secret. Copy the names from .github/secrets.example.txt.
+# To create: Settings -> Secrets and variables -> Actions -> repository
+# secrets. Names: see .github/secrets.example.txt.
 env:
-  DATABASE_URL: ${{ secrets.DATABASE_URL }}
   NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
   GITHUB_ID: ${{ secrets.GITHUB_ID }}
   GITHUB_SECRET: ${{ secrets.GITHUB_SECRET }}
-  SHADOW_DATABASE_URL: ${{ secrets.SHADOW_DATABASE_URL }}
 
 jobs:
   build-and-serve:
@@ -34,6 +31,13 @@ jobs:
         run: |
           docker rm -f neuralnexus || true
 
+      - name: Ensure SQLite data volume exists
+        # Named volume created on first use; keeps the SQLite file
+        # across container rebuilds. Bind-mounts are fine too.
+        run: |
+          docker volume inspect nn-sqlite >/dev/null 2>&1 \
+            || docker volume create nn-sqlite
+
       - name: Run
         run: |
           docker run -d \
@@ -41,11 +45,11 @@ jobs:
             --restart unless-stopped \
             --network host \
             -e NEXT_TELEMETRY_DISABLED=1 \
-            -e DATABASE_URL="${DATABASE_URL}" \
+            -e DATABASE_URL="file:/data/dev.db" \
             -e NEXTAUTH_SECRET="${NEXTAUTH_SECRET}" \
             -e GITHUB_ID="${GITHUB_ID}" \
             -e GITHUB_SECRET="${GITHUB_SECRET}" \
-            -e SHADOW_DATABASE_URL="${SHADOW_DATABASE_URL}" \
+            -v nn-sqlite:/data \
             neuralnexus:dev
           docker logs --tail 30 neuralnexus
 
@@ -54,7 +58,19 @@ jobs:
           for i in $(seq 1 90); do
             if docker inspect -f '{{.State.Running}}' neuralnexus 2>/dev/null | grep -q true \
                && curl -fsSL http://127.0.0.1:3000/ >/dev/null 2>&1; then
-              echo "healthy"; exit 0
+              echo "web: healthy"
+              # Verify the SQLite schema is queryable inside the container.
+              db_check=$(cat <<'NODE'
+              const {PrismaClient}=require("@prisma/client");
+              const p=new PrismaClient({datasources:{db:{url:"file:/data/dev.db"}}});
+              p.\$queryRaw("select count(1) as n from sqlite_master where type='table'")
+               .then(r=>{console.log("sqlite tables:",r[0].n);return p.\$disconnect()})
+               .catch(e=>{console.error("db failed:",e.message);process.exit(1)});
+              NODE
+              )
+              printf '%s\n' "$db_check" | docker exec -i neuralnexus node
+              echo "healthy"
+              exit 0
             fi
             sleep 2
           done
