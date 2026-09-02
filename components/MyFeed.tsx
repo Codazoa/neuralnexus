@@ -7,6 +7,12 @@ interface Article {
   title?: string;
   link?: string;
   pubDate?: string;
+  /** Display label for where this item came from (feed title or hostname). */
+  source?: string | null;
+  /** Image above the title (articles) — or the card visual for video feeds. */
+  thumbnail?: string | null;
+  /** YouTube video id (when present shows an embedded player below the title). */
+  videoId?: string | null;
 }
 
 const PAGES_TO_SHOW = 10;
@@ -88,6 +94,9 @@ export default function MyFeed() {
                 title={item.title || '(untitled)'}
                 link={item.link || '#'}
                 date={item.pubDate ? new Date(item.pubDate) : new Date(0)}
+                source={item.source}
+                thumbnail={item.thumbnail}
+                videoId={item.videoId}
               />
             ))}
         </div>
