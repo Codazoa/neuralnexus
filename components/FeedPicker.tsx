@@ -71,6 +71,10 @@ export function FeedUrlForm({ user }: any) {
 
 export function FeedDeleteForm({ item }: any) {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [categories, setCategories] = useState((item.categories || []).join(', '));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const delFeed = async () => {
     await fetch(`/api/feeds?feedId=${item.id}`, {
@@ -80,15 +84,104 @@ export function FeedDeleteForm({ item }: any) {
     router.refresh();
   };
 
+  const saveCategories = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    const res = await fetch('/api/feeds', {
+      method: 'PATCH',
+      body: JSON.stringify({ feedId: item.id, categories }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    setSaving(false);
+    if (res.ok) {
+      setEditing(false);
+      router.refresh();
+    } else {
+      let message = 'Could not update the feed';
+      try {
+        const data = await res.json();
+        if (data && data.error) message = data.error;
+      } catch {
+        // keep default message on unparseable bodies
+      }
+      setError(message);
+    }
+  };
+
   return (
-    <div className="nn-surface nn-border flex items-center justify-between gap-3 rounded-lg px-3 py-2.5">
-      <p className="nn-mut min-w-0 flex-1 truncate text-sm">{item.feed_url}</p>
-      <button
-        className="nn-btn nn-btn-ghost shrink-0 !px-3 !py-1.5 !text-xs"
-        onClick={delFeed}
-      >
-        Delete
-      </button>
+    <div className="nn-surface nn-border rounded-lg px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="nn-mut truncate text-sm">{item.feed_url}</p>
+          {(item.categories || []).length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {(item.categories || []).map((name: string) => (
+                <span
+                  key={name}
+                  className="nn-mut rounded-full border px-2 py-0.5 text-[10px]"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
+          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
+        {!editing ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              className="nn-btn nn-btn-ghost !px-3 !py-1.5 !text-xs"
+              onClick={() => {
+                setCategories((item.categories || []).join(', '));
+                setError(null);
+                setEditing(true);
+              }}
+            >
+              Edit
+            </button>
+            <button
+              className="nn-btn nn-btn-ghost shrink-0 !px-3 !py-1.5 !text-xs"
+              onClick={delFeed}
+            >
+              Delete
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={saveCategories}
+            className="flex w-full flex-col gap-1.5 border-t pt-2 sm:w-auto sm:border-0 sm:pt-0"
+          >
+            <div className="flex items-center gap-1.5">
+              <input
+                className="nn-input sm:w-56"
+                type="text"
+                value={categories}
+                onChange={(e) => setCategories(e.target.value)}
+                placeholder="Categories (e.g. tech, gaming) — leave empty for none"
+                aria-label={`Categories for ${item.feed_url}`}
+              />
+              <button
+                className="nn-btn nn-btn-primary shrink-0 !px-3 !py-1.5 !text-xs"
+                type="submit"
+                disabled={saving}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                className="nn-btn nn-btn-ghost shrink-0 !px-3 !py-1.5 !text-xs"
+                type="button"
+                onClick={() => {
+                  setEditing(false);
+                  setError(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

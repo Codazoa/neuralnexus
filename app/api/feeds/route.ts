@@ -138,6 +138,68 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(out);
 }
 
+// PATCH /api/feeds  — update a feed's categories (issue #23).
+// Body: { feedId: string, categories?: string } — `categories` uses the same
+// normalisation as PUT (comma/";"/"and" separated, deduped case-insensitively).
+// An empty/omitted categories value clears all categories on the feed.
+export async function PATCH(request: NextRequest) {
+  const user = await requireUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  let data: { feedId?: string; categories?: string } = {};
+  try {
+    data = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const feedId = (data.feedId || '').trim();
+  if (!feedId) {
+    return NextResponse.json({ error: 'feedId is required' }, { status: 400 });
+  }
+
+  // Only the owner's feed can be modified.
+  const feed = await prisma.feeds.findFirst({
+    where: { id: feedId, userId: user.id },
+  });
+  if (!feed) {
+    return NextResponse.json({ error: 'Feed not found' }, { status: 404 });
+  }
+
+  const names = normalizeCategories(data.categories);
+
+  await prisma.$transaction(async (tx) => {
+    // Replace the feed's category assignments wholesale.
+    await tx.feedCategory.deleteMany({ where: { feedId } });
+    if (names) {
+      for (const name of names) {
+        const cat = await tx.category.upsert({
+          where: { userId_name: { userId: user.id, name } },
+          create: { name, userId: user.id },
+          update: {},
+        });
+        await tx.feedCategory.upsert({
+          where: { feedId_categoryId: { feedId, categoryId: cat.id } },
+          create: { feedId, categoryId: cat.id },
+          update: {},
+        });
+      }
+    }
+  });
+
+  const updated = await prisma.feeds.findFirst({
+    where: { id: feedId },
+    include: { categories: { select: { category: { select: { name: true } } }, orderBy: { categoryId: 'asc' } } },
+  });
+  return NextResponse.json({
+    id: updated!.id,
+    feed_url: updated!.feed_url,
+    categories: updated!.categories.map((c) => c.category.name),
+  });
+}
+
 // DELETE /api/feeds?feedId=...  — remove a feed.
 export async function DELETE(request: NextRequest) {
   const user = await requireUser(request);
