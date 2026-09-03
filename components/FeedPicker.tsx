@@ -1,9 +1,11 @@
 'use client';
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function FeedUrlForm({ user }: any) {
   const router = useRouter();
+  const [categories, setCategories] = useState('');
 
   const addFeed = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -11,7 +13,8 @@ export function FeedUrlForm({ user }: any) {
     const formData = new FormData(e.currentTarget);
 
     const body = {
-      url: formData.get('feed url')
+      url: formData.get('feed url'),
+      categories: categories.trim() || undefined,
     };
 
     const res = await fetch('/api/feeds', {
@@ -22,7 +25,9 @@ export function FeedUrlForm({ user }: any) {
       },
     });
 
-    const data = await res.json();
+    if (res.ok) {
+      setCategories('');
+    }
     router.refresh();
   };
 
@@ -33,18 +38,32 @@ export function FeedUrlForm({ user }: any) {
         Paste an RSS/Atom feed URL — or a YouTube channel link (e.g.
         <span className="nn-mut"> youtube.com/@handle</span>) and we&apos;ll find its feed.
       </p>
-      <form onSubmit={addFeed} className="mt-3 flex flex-col gap-2 sm:flex-row">
+      <form onSubmit={addFeed} className="mt-3 flex flex-col gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            className="nn-input order-2 sm:order-1 sm:flex-1"
+            type="text"
+            name="feed url"
+            defaultValue="https://example.com/feed.rss"
+            placeholder="https://example.com/feed.rss  or  https://www.youtube.com/@YourChannel"
+            aria-label="Feed URL"
+          />
+          <button className="nn-btn nn-btn-primary order-1 sm:order-2" type="submit">
+            Add Feed
+          </button>
+        </div>
         <input
-          className="nn-input order-2 sm:order-1 sm:flex-1"
+          className="nn-input"
           type="text"
-          name="feed url"
-          defaultValue="https://example.com/feed.rss"
-          placeholder="https://example.com/feed.rss  or  https://www.youtube.com/@YourChannel"
-          aria-label="Feed URL"
+          value={categories}
+          onChange={(e) => setCategories(e.target.value)}
+          placeholder="Categories (optional) — e.g. tech, gaming"
+          aria-label="Categories"
         />
-        <button className="nn-btn nn-btn-primary order-1 sm:order-2" type="submit">
-          Add Feed
-        </button>
+        <p className="nn-mut text-[11px]">
+          Optional. Separate several categories with commas to file this feed
+          under more than one.
+        </p>
       </form>
     </div>
   );

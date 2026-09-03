@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/key';
 import Parser from 'rss-parser';
 
-interface FeedLinks {
+interface FeedLinkRow {
   id: string;
   userId: string;
   feed_url: string;
+  categories: { category: { name: string } }[];
 }
 
 /**
@@ -55,20 +56,38 @@ function feedLabel(feed: { title?: string; link?: string }): string {
 // GET /api/feeds/links
 // Fetch the user's subscribed feeds and aggregate the latest items,
 // sorted newest-first. Each item is annotated with:
-//   - source:    display label for the feed (title or hostname)
-//   - thumbnail: best url we could find (media:thumbnail / enclosure / derived)
-//   - videoId:   YouTube video id when the entry is a video (from yt:videoId)
+//   - source:     display label for the feed (title or hostname)
+//   - thumbnail:  best url we could find (media:thumbnail / enclosure / derived)
+//   - videoId:    YouTube video id when the entry is a video (from yt:videoId)
+//   - categories: names of the categories assigned to this feed (issue #20)
+//
+// Optional `?category=<name>` filter: only include items whose feed belongs
+// to that category (case-insensitive match on the category name).
 export async function GET(req: NextRequest) {
   const user = await requireUser(req);
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const feed_list = await prisma.feeds.findMany({
+  const wanted = (req.nextUrl.searchParams.get('category') || '').trim().toLowerCase();
+
+  let feed_list = await prisma.feeds.findMany({
     where: { userId: user.id },
+    include: {
+      categories: {
+        select: { category: { select: { name: true } } },
+        orderBy: { categoryId: 'asc' },
+      },
+    },
   });
 
-  const feed_urls = feed_list.map((item: FeedLinks) => item.feed_url).slice(0, 100);
+  if (wanted) {
+    feed_list = feed_list.filter((f) =>
+      f.categories.some((c) => c.category.name.toLowerCase() === wanted)
+    );
+  }
+
+  const feed_urls = feed_list.map((item: FeedLinkRow) => item.feed_url).slice(0, 100);
 
   const annotated: any[] = [];
 
@@ -90,6 +109,9 @@ export async function GET(req: NextRequest) {
         });
         const feed = await parser.parseURL(url);
         const source = feedLabel(feed);
+        const feedCats: string[] = (
+          feed_list.find((fl) => fl.feed_url === url) || { categories: [] }
+        ).categories.map((c) => c.category.name);
         const items = (feed.items || []).map((rawIt: any) => {
           const videoId =
             (rawIt['yt:videoId'] && String(rawIt['yt:videoId'])) || null;
@@ -122,6 +144,7 @@ export async function GET(req: NextRequest) {
             source,
             thumbnail,
             videoId,
+            feedCategories: feedCats,
           };
           return out;
         });
