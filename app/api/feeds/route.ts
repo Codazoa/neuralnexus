@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/key';
 import { isYouTubeChannelUrl, resolveYouTubeFeed } from '@/lib/youtube';
+import { fetchFeedTitle } from '@/lib/feedmeta';
 
 interface CategoryNameInput {
   name: string;
@@ -69,6 +70,12 @@ export async function PUT(request: NextRequest) {
     resolved = false;
   }
 
+  // Learn a human-friendly name for the feed (issue #26) before we store it:
+  // the feed's own <title> (channel name for YouTube). Failures leave the
+  // name unset so the UI falls back to the hostname; either way the feed is
+  // still added.
+  const learnedName = await fetchFeedTitle(feedUrl);
+
   const existing = await prisma.feeds.findFirst({
     where: { userId: user.id, feed_url: feedUrl },
   });
@@ -83,14 +90,20 @@ export async function PUT(request: NextRequest) {
     id: string;
     userId: string;
     feed_url: string;
+    name: string | null;
   } | null = null;
   let categories: CategoryNameInput[] = [];
 
   await prisma.$transaction(async (tx) => {
     const row = await tx.feeds.create({
-      data: { userId: user.id, feed_url: feedUrl },
+      data: { userId: user.id, feed_url: feedUrl, name: learnedName },
     });
-    created = { id: row.id, userId: row.userId, feed_url: row.feed_url };
+    created = {
+      id: row.id,
+      userId: row.userId,
+      feed_url: row.feed_url,
+      name: row.name,
+    };
 
     if (names) {
       for (const name of names) {
@@ -138,17 +151,21 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(out);
 }
 
-// PATCH /api/feeds  — update a feed's categories (issue #23).
-// Body: { feedId: string, categories?: string } — `categories` uses the same
-// normalisation as PUT (comma/";"/"and" separated, deduped case-insensitively).
-// An empty/omitted categories value clears all categories on the feed.
+// PATCH /api/feeds  — update a feed's categories and/or display name.
+// Body: { feedId: string, categories?: string, name?: string }
+//   - `categories` uses the same normalisation as PUT (comma/";"/"and"
+//     separated, deduped case-insensitively). An empty/omitted value clears
+//     all categories on the feed (issue #20 / #23).
+//   - `name` is the human-facing label for this feed (issue #26). Passing an
+//     empty string clears a previously-set name (falls back to the hostname);
+//     omitting it leaves the stored name untouched.
 export async function PATCH(request: NextRequest) {
   const user = await requireUser(request);
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  let data: { feedId?: string; categories?: string } = {};
+  let data: { feedId?: string; categories?: string; name?: string } = {};
   try {
     data = await request.json();
   } catch {
@@ -169,8 +186,16 @@ export async function PATCH(request: NextRequest) {
   }
 
   const names = normalizeCategories(data.categories);
+  // `name === ''` -> clear the stored name (fall back to hostname in the UI).
+  // `name === undefined` -> leave the stored name alone.
+  const trimmedName =
+    typeof data.name === 'string' ? data.name.trim() : undefined;
+  const newName = trimmedName === '' ? null : trimmedName;
 
   await prisma.$transaction(async (tx) => {
+    if (newName !== undefined) {
+      await tx.feeds.update({ where: { id: feedId }, data: { name: newName } });
+    }
     // Replace the feed's category assignments wholesale.
     await tx.feedCategory.deleteMany({ where: { feedId } });
     if (names) {
@@ -196,6 +221,7 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({
     id: updated!.id,
     feed_url: updated!.feed_url,
+    name: updated!.name,
     categories: updated!.categories.map((c) => c.category.name),
   });
 }
