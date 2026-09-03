@@ -78,14 +78,18 @@ const Feed: React.FC<FeedProps> = ({
 
   const isVideo = !!(videoId && /^[A-Za-z0-9_-]{6,}$/.test(videoId));
 
+  // Video entries carry the embed itself below — the thumbnail above it
+  // just duplicates it (issue #19), so it stays hidden for those.
+  const showThumbnail = !!thumbnail && !isVideo;
+
   return (
     <article
       className={
         "nn-card nn-text overflow-hidden px-0 " +
-        (thumbnail ? "pb-4" : "py-4")
+        (showThumbnail ? "pb-4" : "py-4")
       }
     >
-      {thumbnail && <Thumbnail src={thumbnail} />}
+      {showThumbnail && <Thumbnail src={thumbnail!} />}
 
       <div className="px-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
