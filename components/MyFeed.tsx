@@ -20,6 +20,14 @@ interface Article {
   content?: string | null;
 }
 
+// Pagination caps (issue #38): rendering the full feed at once (the #34
+// "continuous scroll" change) loads every thumbnail image + every embedded
+// YouTube iframe simultaneously, which overflows iOS WebKit's memory budget
+// and crash-kills the page ("A problem repeatedly occurred on …"). Cap the
+// mounted DOM again: 10 articles per page, 100 articles reachable in total.
+const PAGES_TO_SHOW = 10;
+const ARTICLES_TO_GET = 100;
+
 /** A feed the server tried to load this cycle but couldn't (issue #25). */
 interface FailedFeed {
   label: string;
@@ -50,6 +58,8 @@ export default function MyFeed() {
   // shows if it matches ANY of them (OR semantics), e.g. tech + gaming shows
   // both and still hides politics.
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+  // Page index (issue #38): restored from #34's removal — see PAGES_TO_SHOW.
+  const [page, setPage] = useState(1);
 
   // Union of category names across loaded feeds (case-insensitively unique,
   // insertion order preserved — the order feeds were added in).
@@ -79,7 +89,18 @@ export default function MyFeed() {
           )
         );
 
-  // Issue #34: one continuous scroll — no pagination / page buttons.
+  // Issue #38: pagination restored (10 per page, capped at ARTICLES_TO_GET).
+  // `visible` is filtered by the active categories; clamp the page we render
+  // to what actually exists so a stale page index never shows an empty list.
+  const max_pages = Math.max(
+    1,
+    Math.ceil(Math.min(ARTICLES_TO_GET, visible.length) / PAGES_TO_SHOW)
+  );
+  const safePage = Math.max(1, Math.min(page, max_pages));
+  const changePage = (delta: number) =>
+    setPage((p) => Math.max(1, Math.min(max_pages, p + delta)));
+  const changePageTo = (target: number) =>
+    setPage(Math.max(1, Math.min(max_pages, target)));
 
   const toggleCategory = (name: string | null) => {
     const next = new Set(activeCategories);
@@ -92,7 +113,13 @@ export default function MyFeed() {
       else next.add(key);
     }
     setActiveCategories(next);
+    // A category toggle changes which items are visible — jump back to the
+    // first page so we don't land on a now-empty page (issue #38).
+    setPage(1);
   };
+
+  const pageButton =
+    'nn-btn nn-btn-ghost !px-3.5 !py-2 disabled:cursor-not-allowed';
 
   const getArticles = useCallback(async () => {
     if (inFlight.current) return; // ignore a second Refresh while already fetching
@@ -234,7 +261,7 @@ export default function MyFeed() {
             </p>
           )}
 
-          {visible.map((item, i) => (
+          {visible.slice((safePage - 1) * PAGES_TO_SHOW, safePage * PAGES_TO_SHOW).map((item, i) => (
             <Feed
               key={item.link || i}
               title={item.title || '(untitled)'}
@@ -246,6 +273,29 @@ export default function MyFeed() {
               content={item.content}
             />
           ))}
+        </div>
+
+        {/* Pagination (issue #38): caps the mounted DOM so /myfeed does not
+             overflow iOS WebKit's memory budget and crash out a few seconds
+             after load. 10 per page, max ARTICLES_TO_GET reachable. The
+             #34 "continuous scroll" change removed these controls — that was
+             the regression this issue reports. */}
+        <div className="mt-8 flex items-center justify-center gap-2 sm:gap-3">
+          <button className={pageButton} onClick={() => changePageTo(1)} disabled={safePage <= 1}>
+            First
+          </button>
+          <button className={pageButton} onClick={() => changePage(-1)} disabled={safePage <= 1}>
+            Prev
+          </button>
+          <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
+            {safePage}
+          </span>
+          <button className={pageButton} onClick={() => changePage(1)} disabled={safePage >= max_pages}>
+            Next
+          </button>
+          <button className={pageButton} onClick={() => changePageTo(max_pages)} disabled={safePage >= max_pages}>
+            Last
+          </button>
         </div>
       </div>
     </div>
