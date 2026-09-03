@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import DropDownMenu from '@/components/DropDownMenu';
+import RefreshButton from '@/components/RefreshButton';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function NavMenu() {
@@ -12,6 +13,7 @@ export default function NavMenu() {
           </h1>
         </Link>
         <div className="flex items-center gap-2">
+          <RefreshButton />
           <ThemeToggle />
           <DropDownMenu />
         </div>
