@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/key';
 import Parser from 'rss-parser';
+import { channelFromFeedUrl, extractChannelNameFromHtml } from '@/lib/youtube';
 
 // GET /api/feeds/links
 // Returns the user's feeds' items (newest-first), aggregated across feeds.
@@ -44,6 +45,49 @@ const PARSER_OPTS = {
 };
 
 // --- helpers ----------------------------------------------------------------
+
+/**
+ * Self-heals YouTube feeds that arrived with a null name (the issue #26 code
+ * path that leaves the UI showing "youtube.com"). When we have a canonical
+ * channel feed url but no stored name, we fetch the channel page to learn its
+ * display name, then persist it. Best-effort: any failure returns null so the
+ * caller keeps the hostname fallback exactly as it did before.
+ *
+ * `rowName` is the currently-stored name (may be null). We only attempt the
+ * fetch when it's still unset — once a name is present (user-entered or learned)
+ * we never overwrite it here.
+ */
+async function learnYouTubeName(
+  feedUrl: string,
+  rowName: string | null
+): Promise<string | null> {
+  if ((rowName || '').trim()) return null; // respect existing name (user or learned)
+  const ch = channelFromFeedUrl(feedUrl);
+  if (!ch) return null;
+  try {
+    // Fetch the channel's /about page — the document <title>/og:title there is
+    // the channel name, and it does not depend on the YouTube RSS feed being
+    // reachable (which is what failed in issue #29).
+    const aboutUrl = `https://www.youtube.com/channel/${ch}/about`;
+    const r = await fetch(aboutUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; neuralnexus/0.0; RSS feed name)',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const name = extractChannelNameFromHtml(html);
+    if (name && /^\d/.test(name) === false) return name; // skip accidental pure-numeric
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Pull a thumbnail url out of the various shapes a feed can expose:
@@ -319,7 +363,18 @@ export async function GET(req: NextRequest) {
       }
 
       if (parsed) {
-        const source = labelFor(row, parsed as any);
+        let source = labelFor(row, parsed as any);
+        // Self-heal: a YouTube feed that has no stored name (issue #29 left it
+        // as "youtube.com") gets its channel name learned + persisted now that we
+        // have a successful fetch to hook onto. This is the path that fixes the
+        // *existing* feeds the user is complaining about.
+        if (!(row.name || '').trim() && channelFromFeedUrl(row.feed_url)) {
+          const learned = await learnYouTubeName(row.feed_url, row.name);
+          if (learned) {
+            await prisma.feeds.update({ where: { id: row.id }, data: { name: learned } }).catch(() => {});
+            source = learned;
+          }
+        }
         const raw = parsed.items || [];
         if (raw.length === 0) {
           // Reachable but empty — treat as "failed" unless we have a cache.
