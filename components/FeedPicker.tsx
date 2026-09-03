@@ -69,9 +69,23 @@ export function FeedUrlForm({ user }: any) {
   );
 }
 
+// Human label for a feed: the stored name (issue #26) else the hostname of
+// the feed url — so a `youtube.com/feeds/videos.xml?channel_id=UC...` link
+// shows as "youtube.com", not as the channel-id blob.
+function feedDisplayName(item: { name?: string | null; feed_url: string }): string {
+  const stored = (item.name || '').trim();
+  if (stored) return stored;
+  try {
+    return new URL(item.feed_url).hostname.replace(/^www\./, '');
+  } catch {
+    return item.feed_url;
+  }
+}
+
 export function FeedDeleteForm({ item }: any) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [name, setName] = useState((item.name || '').trim());
   const [categories, setCategories] = useState((item.categories || []).join(', '));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +104,12 @@ export function FeedDeleteForm({ item }: any) {
     setError(null);
     const res = await fetch('/api/feeds', {
       method: 'PATCH',
-      body: JSON.stringify({ feedId: item.id, categories }),
+      body: JSON.stringify({
+        feedId: item.id,
+        // `name: ''` clears the stored name (falls back to the hostname).
+        name: name.trim(),
+        categories,
+      }),
       headers: { 'Content-Type': 'application/json' },
     });
     setSaving(false);
@@ -113,7 +132,8 @@ export function FeedDeleteForm({ item }: any) {
     <div className="nn-surface nn-border rounded-lg px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="nn-mut truncate text-sm">{item.feed_url}</p>
+          <p className="nn-text truncate text-sm font-semibold">{feedDisplayName(item)}</p>
+          <p className="nn-mut truncate text-xs">{item.feed_url}</p>
           {(item.categories || []).length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {(item.categories || []).map((name: string) => (
@@ -133,6 +153,7 @@ export function FeedDeleteForm({ item }: any) {
             <button
               className="nn-btn nn-btn-ghost !px-3 !py-1.5 !text-xs"
               onClick={() => {
+                setName((item.name || '').trim());
                 setCategories((item.categories || []).join(', '));
                 setError(null);
                 setEditing(true);
@@ -152,6 +173,16 @@ export function FeedDeleteForm({ item }: any) {
             onSubmit={saveCategories}
             className="flex w-full flex-col gap-1.5 border-t pt-2 sm:w-auto sm:border-0 sm:pt-0"
           >
+            <div className="flex items-center gap-1.5">
+              <input
+                className="nn-input sm:w-56"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name (e.g. The Verge) — leave empty for the hostname"
+                aria-label={`Name for ${item.feed_url}`}
+              />
+            </div>
             <div className="flex items-center gap-1.5">
               <input
                 className="nn-input sm:w-56"

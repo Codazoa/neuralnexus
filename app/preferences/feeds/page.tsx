@@ -7,6 +7,7 @@ interface FeedLinks {
   id: string;
   userId: string;
   feed_url: string;
+  name: string | null;
   categories: string[];
 }
 
@@ -56,6 +57,7 @@ async function FeedList({ userId }: { userId: string }) {
     id: f.id,
     userId: f.userId,
     feed_url: f.feed_url,
+    name: f.name,
     categories: f.categories.map((c) => c.category.name),
   }));
   return (

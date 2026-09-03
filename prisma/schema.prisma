@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,23 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Single local user (this app lives on one device, one person).
 model User {
-  id        String    @id @default(cuid())
-  name      String?
-  age       Int?
-  bio       String?
-  image     String?
-  createdAt DateTime  @default(now())
-  apiKey    ApiKey?
-  feeds     Feeds[]
+  id         String     @id @default(cuid())
+  name       String?
+  age        Int?
+  bio        String?
+  image      String?
+  createdAt  DateTime   @default(now())
+  apiKey     ApiKey?
   categories Category[]
+  feeds      Feeds[]
 }
 
-// A locally-generated private key. The raw key only ever exists on the
-// device; the server stores its SHA-256 hash. First key ever registered
-// on this database becomes the user's key (registration happens on
-// first unlock, no sign-up step).
 model ApiKey {
   id         String    @id @default(cuid())
   keyHash    String    @unique
@@ -38,31 +30,41 @@ model ApiKey {
 }
 
 model Feeds {
-  id       String @id @default(cuid())
-  userId   String
-  feed_url String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String         @id @default(cuid())
+  userId     String
+  feed_url   String
+  name       String?
   categories FeedCategory[]
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// A category a user assigns to their feeds (e.g. "tech", "sports").
-// Used to sort/filter the aggregated everything-feed on the My Feed page.
 model Category {
-  id     String @id @default(cuid())
+  id     String         @id @default(cuid())
   name   String
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   feeds  FeedCategory[]
 
   @@unique([userId, name])
 }
 
-// Join table: one feed may belong to multiple categories.
 model FeedCategory {
   feedId     String
   categoryId String
-  feed       Feeds    @relation(fields: [feedId], references: [id], onDelete: Cascade)
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  feed       Feeds    @relation(fields: [feedId], references: [id], onDelete: Cascade)
 
   @@id([feedId, categoryId])
+}
+
+model FeedCache {
+  userId        String
+  feedId        String
+  name          String?
+  source        String
+  items         String
+  lastFetchedAt DateTime
+  updatedAt     DateTime @updatedAt
+
+  @@id([userId, feedId])
 }
