@@ -154,6 +154,18 @@ a {
     border-color: color-mix(in srgb, var(--nn-accent) 55%, transparent);
   }
 
+  /* Feed entry body (issue #33): styled HTML content when a card expands. */
+  .nn-article { color: var(--nn-text); }
+  .nn-article a {
+    color: var(--nn-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+  }
+  .nn-article img { max-width: 100%; border-radius: 0.5rem; height: auto; }
+  .nn-article p { margin: 0; }
+  .nn-article img + p, .nn-article p + img { margin-top: 0.5rem; }
+
   /* Themed hover affordances (kept in CSS because `.nn-*` is a component
      class, so Tailwind can't emit `hover:` variants for it). */
   .nn-link {

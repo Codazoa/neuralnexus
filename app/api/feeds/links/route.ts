@@ -133,6 +133,8 @@ interface FeedItem {
   thumbnail: string | null;
   videoId: string | null;
   feedCategories: string[];
+  /** HTML content of the entry (issue #33) — shown when the card expands. */
+  content: string | null;
 }
 
 export interface FailedFeed {
@@ -204,6 +206,13 @@ function shapeItems(
       thumbnail,
       videoId,
       feedCategories: feedCats,
+      // Entry body (issue #33): rss-parser exposes `content` (html) or
+      // `contentSnippet` (text) by default; normalise to a single field.
+      content: (typeof rawIt.content === 'string' && rawIt.content.trim())
+        ? rawIt.content
+        : (typeof rawIt.contentSnippet === 'string' && rawIt.contentSnippet.trim())
+        ? rawIt.contentSnippet
+        : null,
     };
   });
 }

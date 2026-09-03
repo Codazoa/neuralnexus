@@ -3,9 +3,27 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function FeedUrlForm({ user }: any) {
+export function FeedUrlForm({ existingCategories }: { existingCategories?: string[] }) {
   const router = useRouter();
   const [categories, setCategories] = useState('');
+
+  // Issue #35: existing categories offered as a dropdown (datalist) so the
+  // user can pick an already-used one instead of retyping it. Typed and
+  // deduped case-insensitively, keeping first-seen casing.
+  const options = (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of existingCategories || []) {
+      const t = (c || '').trim();
+      if (!t) continue;
+      const key = t.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(t);
+      }
+    }
+    return out;
+  })();
 
   const addFeed = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -57,9 +75,21 @@ export function FeedUrlForm({ user }: any) {
           type="text"
           value={categories}
           onChange={(e) => setCategories(e.target.value)}
-          placeholder="Categories (optional) — e.g. tech, gaming"
+          list={options.length ? 'existing-categories' : undefined}
+          placeholder={
+            options.length
+              ? 'Categories (optional) — pick an existing one or type a new one'
+              : 'Categories (optional) — e.g. tech, gaming'
+          }
           aria-label="Categories"
         />
+        {options.length > 0 && (
+          <datalist id="existing-categories">
+            {options.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        )}
         <p className="nn-mut text-[11px]">
           Optional. Separate several categories with commas to file this feed
           under more than one.
@@ -82,13 +112,28 @@ function feedDisplayName(item: { name?: string | null; feed_url: string }): stri
   }
 }
 
-export function FeedDeleteForm({ item }: any) {
+export function FeedDeleteForm({ item, existingCategories }: any) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState((item.name || '').trim());
   const [categories, setCategories] = useState((item.categories || []).join(', '));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Issue #35: dropdown (datalist) of existing categories in the edit form.
+  const options = (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of existingCategories || []) {
+      const t = String(c || '').trim();
+      if (!t) continue;
+      const key = t.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(t);
+      }
+    }
+    return out;
+  })();
 
   const delFeed = async () => {
     await fetch(`/api/feeds?feedId=${item.id}`, {
@@ -189,9 +234,17 @@ export function FeedDeleteForm({ item }: any) {
                 type="text"
                 value={categories}
                 onChange={(e) => setCategories(e.target.value)}
+                list={options.length ? 'existing-categories-edit' : undefined}
                 placeholder="Categories (e.g. tech, gaming) — leave empty for none"
                 aria-label={`Categories for ${item.feed_url}`}
               />
+              {options.length > 0 && (
+                <datalist id="existing-categories-edit">
+                  {options.map((n: string) => (
+                    <option key={n} value={n} />
+                  ))}
+                </datalist>
+              )}
               <button
                 className="nn-btn nn-btn-primary shrink-0 !px-3 !py-1.5 !text-xs"
                 type="submit"
