@@ -20,6 +20,7 @@ model User {
   createdAt DateTime  @default(now())
   apiKey    ApiKey?
   feeds     Feeds[]
+  categories Category[]
 }
 
 // A locally-generated private key. The raw key only ever exists on the
@@ -41,4 +42,27 @@ model Feeds {
   userId   String
   feed_url String
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories FeedCategory[]
+}
+
+// A category a user assigns to their feeds (e.g. "tech", "sports").
+// Used to sort/filter the aggregated everything-feed on the My Feed page.
+model Category {
+  id     String @id @default(cuid())
+  name   String
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feeds  FeedCategory[]
+
+  @@unique([userId, name])
+}
+
+// Join table: one feed may belong to multiple categories.
+model FeedCategory {
+  feedId     String
+  categoryId String
+  feed       Feeds    @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([feedId, categoryId])
 }

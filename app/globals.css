@@ -142,6 +142,17 @@ a {
     color: var(--nn-accent);
     border-color: color-mix(in srgb, var(--nn-accent) 45%, transparent);
   }
+  /* Active/selected chip-style filter button (issue #20 category pills). */
+  .nn-btn-active {
+    background-color: color-mix(in srgb, var(--nn-accent) 14%, transparent);
+    color: var(--nn-accent);
+    border-color: color-mix(in srgb, var(--nn-accent) 55%, transparent);
+  }
+  .nn-btn-active:hover {
+    background-color: color-mix(in srgb, var(--nn-accent) 22%, transparent);
+    color: var(--nn-accent);
+    border-color: color-mix(in srgb, var(--nn-accent) 55%, transparent);
+  }
 
   /* Themed hover affordances (kept in CSS because `.nn-*` is a component
      class, so Tailwind can't emit `hover:` variants for it). */
