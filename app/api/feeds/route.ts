@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/key';
-import { isYouTubeChannelUrl, resolveYouTubeFeed } from '@/lib/youtube';
+import { isYouTubeChannelUrl, resolveYouTubeChannel } from '@/lib/youtube';
 import { fetchFeedTitle } from '@/lib/feedmeta';
 
 interface CategoryNameInput {
@@ -56,13 +56,18 @@ export async function PUT(request: NextRequest) {
 
   // YouTube channel -> canonical RSS feed url. Falls back to the entered url on
   // failure so a bad/unknown link still behaves exactly like it did before.
+  // Also captures the channel's display name when the page had to be fetched
+  // (issue #29) — we prefer it over the feed's <title>, which is the only thing
+  // that reliably survives when fetchFeedTitle can't reach the feed itself.
   let feedUrl = enteredUrl;
   let resolved: boolean;
+  let learnedName: string | null = null;
   if (isYouTubeChannelUrl(enteredUrl)) {
-    const converted = await resolveYouTubeFeed(enteredUrl);
-    if (converted) {
-      feedUrl = converted;
+    const conv = await resolveYouTubeChannel(enteredUrl);
+    if (conv) {
+      feedUrl = conv.feedUrl;
       resolved = true;
+      learnedName = conv.name;
     } else {
       resolved = false;
     }
@@ -73,8 +78,11 @@ export async function PUT(request: NextRequest) {
   // Learn a human-friendly name for the feed (issue #26) before we store it:
   // the feed's own <title> (channel name for YouTube). Failures leave the
   // name unset so the UI falls back to the hostname; either way the feed is
-  // still added.
-  const learnedName = await fetchFeedTitle(feedUrl);
+  // still added. The channel-name learned during resolution (issue #29) wins
+  // when it is present, because it does not depend on being able to fetch the
+  // feed itself.
+  const feedTitle = learnedName ? null : await fetchFeedTitle(feedUrl);
+  learnedName = learnedName || feedTitle;
 
   const existing = await prisma.feeds.findFirst({
     where: { userId: user.id, feed_url: feedUrl },
