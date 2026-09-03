@@ -7,6 +7,7 @@ interface FeedLinks {
   id: string;
   userId: string;
   feed_url: string;
+  categories: string[];
 }
 
 // /preferences/feeds — manage the device's RSS feeds, behind the key gate.
@@ -19,7 +20,8 @@ export default async function FeedsPreference() {
         <div>
           <h1 className="nn-text text-2xl font-bold tracking-tight">Feeds</h1>
           <p className="nn-mut mt-1 text-sm">
-            Add or remove the RSS feeds that make up your everything feed.
+            Add, edit, or remove the RSS feeds that make up your
+            everything feed.
           </p>
 
           <div className="mt-5">
@@ -41,13 +43,27 @@ export default async function FeedsPreference() {
 }
 
 async function FeedList({ userId }: { userId: string }) {
-  const feed_list = await prisma.feeds.findMany({ where: { userId } });
+  const feed_list = await prisma.feeds.findMany({
+    where: { userId },
+    include: {
+      categories: {
+        select: { category: { select: { name: true } } },
+        orderBy: { categoryId: 'asc' },
+      },
+    },
+  });
+  const feeds = feed_list.map((f) => ({
+    id: f.id,
+    userId: f.userId,
+    feed_url: f.feed_url,
+    categories: f.categories.map((c) => c.category.name),
+  }));
   return (
     <>
-      {feed_list.map((item: FeedLinks) => (
+      {feeds.map((item: FeedLinks) => (
         <FeedDeleteForm item={item} key={item.id} />
       ))}
-      {feed_list.length === 0 && (
+      {feeds.length === 0 && (
         <p className="nn-mut text-sm">No feeds yet.</p>
       )}
     </>
