@@ -4,6 +4,8 @@ interface FeedProps {
   title: string;
   link: string;
   date: Date;
+  /** HTML or text body of the entry (issue #33). */
+  content?: string | null;
   /** Human-facing label of where this item came from (e.g. "The Verge"). */
   source?: string | null;
   /** Image to show above the title (articles) — or used as the card visual. */
@@ -65,10 +67,14 @@ const Feed: React.FC<FeedProps> = ({
   title,
   link,
   date,
+  content,
   source,
   thumbnail,
   videoId,
 }) => {
+  // issue #33: clicking a feed entry expands it and shows the content field.
+  const [expanded, setExpanded] = React.useState(false);
+
   const safeDate = Number.isNaN(new Date(date).getTime()) ? new Date(0) : new Date(date);
   const formattedDate = safeDate.toLocaleDateString("en-US", {
     day: "numeric",
@@ -81,6 +87,7 @@ const Feed: React.FC<FeedProps> = ({
   // Video entries carry the embed itself below — the thumbnail above it
   // just duplicates it (issue #19), so it stays hidden for those.
   const showThumbnail = !!thumbnail && !isVideo;
+  const hasContent = !!(content && content.trim());
 
   return (
     <article
@@ -97,16 +104,55 @@ const Feed: React.FC<FeedProps> = ({
           <span className="nn-mut text-xs">{formattedDate}</span>
         </div>
 
-        <h3 className="nn-text mt-2 text-base font-semibold leading-snug sm:text-lg">
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
+        <h3 className="nn-text mt-2 flex items-start gap-2 text-base font-semibold leading-snug sm:text-lg">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="text-left hover:underline"
           >
             {title}
-          </a>
+          </button>
+          <span
+            className={
+              "nn-mut mt-1 shrink-0 transition-transform duration-150 " +
+              (expanded ? "rotate-180" : "")
+            }
+            aria-hidden="true"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
         </h3>
+
+        {expanded && (
+          <div className="mt-3 border-t nn-border pt-3">
+            {hasContent ? (
+              <div
+                className="nn-article space-y-2 pr-1 text-sm leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: content! }}
+              />
+            ) : (
+              <p className="nn-mut text-sm italic">
+                This feed doesn’t include the entry’s body text.
+              </p>
+            )}
+            <div className="mt-4 flex items-center gap-2">
+              <a
+                className="nn-btn nn-btn-primary"
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open original
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M7 17 17 7M9 7h8v8" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       {isVideo && <YoutubeFrame videoId={videoId!} title={title} />}

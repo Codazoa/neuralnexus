@@ -16,6 +16,8 @@ interface Article {
   videoId?: string | null;
   /** Names of the categories this item's feed was filed under (issue #20). */
   feedCategories?: string[] | null;
+  /** HTML content of the entry, shown when the card expands (issue #33). */
+  content?: string | null;
 }
 
 /** A feed the server tried to load this cycle but couldn't (issue #25). */
@@ -34,21 +36,20 @@ interface FeedLinksPayload {
   failedFeeds?: FailedFeed[];
 }
 
-const PAGES_TO_SHOW = 10;
-const ARTICLES_TO_GET = 100;
-
 export default function MyFeed() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [failedFeeds, setFailedFeeds] = useState<FailedFeed[]>([]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Ref guard to ignore a second Refresh click while the first fetch is
   // still in flight (setState hasn't landed by the time the closure was
   // captured — so we don't rely on the `loading` state here).
   const inFlight = useRef(false);
-  // Active category filter: null = "All" (everything), else an exact name.
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  // Active category filter (issue #36): a SET of names, not one. Empty set =
+  // "All" (everything). Toggle as many categories as you like — an item
+  // shows if it matches ANY of them (OR semantics), e.g. tech + gaming shows
+  // both and still hides politics.
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
 
   // Union of category names across loaded feeds (case-insensitively unique,
   // insertion order preserved — the order feeds were added in).
@@ -67,31 +68,31 @@ export default function MyFeed() {
     return out;
   })();
 
+  // Issue #36: multiple selected categories at once (OR semantics) — an
+  // item shows if it matches ANY of the selected names.
   const visible =
-    activeCategory === null
+    activeCategories.size === 0
       ? articles
       : articles.filter((a) =>
-          (a.feedCategories || []).some(
-            (n) => n.toLowerCase() === activeCategory!.toLowerCase()
+          (a.feedCategories || []).some((n) =>
+            activeCategories.has(n.toLowerCase())
           )
         );
 
-  // Ceil (not floor) so a partial last page is reachable: with 11–19 items a
-  // floor would collapse max_pages to 1 and leave items 11+ hidden behind a
-  // disabled Next/Last. Clamp to 1 when empty.
-  const max_pages = Math.max(
-    1,
-    Math.ceil(Math.min(ARTICLES_TO_GET, visible.length) / PAGES_TO_SHOW)
-  );
+  // Issue #34: one continuous scroll — no pagination / page buttons.
 
-  const changePage = (x: number) => {
-    setPage((p) => Math.max(1, Math.min(max_pages, p + x)));
+  const toggleCategory = (name: string | null) => {
+    const next = new Set(activeCategories);
+    if (name === null) {
+      // "All" clears the selection.
+      next.clear();
+    } else {
+      const key = name.toLowerCase();
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+    }
+    setActiveCategories(next);
   };
-
-  const selectCategory = (name: string | null) => {
-    setActiveCategory(name);
-    setPage(1);
-  }
 
   const getArticles = useCallback(async () => {
     if (inFlight.current) return; // ignore a second Refresh while already fetching
@@ -139,9 +140,6 @@ export default function MyFeed() {
     };
   }, [getArticles]);
 
-  const pageButton =
-    'nn-btn nn-btn-ghost !px-3.5 !py-2 disabled:cursor-not-allowed';
-
   return (
     <div className="nn-bg min-h-[70vh]">
       <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8">
@@ -156,10 +154,10 @@ export default function MyFeed() {
           <button
             className={
               'nn-btn nn-btn-ghost !px-3 !py-1.5 !text-xs ' +
-              (activeCategory === null ? 'nn-btn-active' : '')
+              (activeCategories.size === 0 ? 'nn-btn-active' : '')
             }
-            onClick={() => selectCategory(null)}
-            aria-pressed={activeCategory === null}
+            onClick={() => toggleCategory(null)}
+            aria-pressed={activeCategories.size === 0}
           >
             All
           </button>
@@ -168,17 +166,23 @@ export default function MyFeed() {
               key={name}
               className={
                 'nn-btn nn-btn-ghost !px-3 !py-1.5 !text-xs ' +
-                (activeCategory?.toLowerCase() === name.toLowerCase()
+                (activeCategories.has(name.toLowerCase())
                   ? 'nn-btn-active'
                   : '')
               }
-              onClick={() => selectCategory(name)}
-              aria-pressed={activeCategory?.toLowerCase() === name.toLowerCase()}
+              onClick={() => toggleCategory(name)}
+              aria-pressed={activeCategories.has(name.toLowerCase())}
             >
               {name}
             </button>
           ))}
         </div>
+        {activeCategories.size > 1 && (
+          <p className="nn-mut mt-1.5 text-xs">
+            Showing feeds in {activeCategories.size} selected categories —
+            pick another to add it, or hit “All” to clear.
+          </p>
+        )}
 
         {/* Feeds that didn't load on this cycle (issue #25): the user can
              press the Refresh button above to retry — the server also
@@ -223,52 +227,25 @@ export default function MyFeed() {
           {!loading && visible.length === 0 && !error && (
             <p className="nn-surface-2 nn-border rounded-lg px-4 py-6 text-center text-sm">
               <span className="nn-mut">
-                {activeCategory
-                  ? `Nothing in “${activeCategory}” yet — add a feed to this category under Feeds.`
+                {activeCategories.size > 0
+                  ? 'Nothing in the selected categories yet — add a feed to one of them under Feeds, or pick a different category.'
                   : 'No feeds yet — add one from the menu → Feeds.'}
               </span>
             </p>
           )}
 
-          {visible
-            .slice((page - 1) * PAGES_TO_SHOW, page * PAGES_TO_SHOW)
-            .map((item, i) => (
-              <Feed
-                key={item.link || i}
-                title={item.title || '(untitled)'}
-                link={item.link || '#'}
-                date={item.pubDate ? new Date(item.pubDate) : new Date(0)}
-                source={item.source}
-                thumbnail={item.thumbnail}
-                videoId={item.videoId}
-              />
-            ))}
-        </div>
-
-        <div className="mt-8 flex items-center justify-center gap-2 sm:gap-3">
-          <button className={pageButton} onClick={() => setPage(1)}>
-            First
-          </button>
-          <button
-            className={pageButton}
-            onClick={() => changePage(-1)}
-            disabled={page <= 1}
-          >
-            Prev
-          </button>
-          <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
-            {page}
-          </span>
-          <button
-            className={pageButton}
-            onClick={() => changePage(1)}
-            disabled={page >= max_pages}
-          >
-            Next
-          </button>
-          <button className={pageButton} onClick={() => setPage(max_pages)}>
-            Last
-          </button>
+          {visible.map((item, i) => (
+            <Feed
+              key={item.link || i}
+              title={item.title || '(untitled)'}
+              link={item.link || '#'}
+              date={item.pubDate ? new Date(item.pubDate) : new Date(0)}
+              source={item.source}
+              thumbnail={item.thumbnail}
+              videoId={item.videoId}
+              content={item.content}
+            />
+          ))}
         </div>
       </div>
     </div>

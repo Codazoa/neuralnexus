@@ -15,6 +15,17 @@ interface FeedLinks {
 export default async function FeedsPreference() {
   const user = await getCurrentUser();
 
+  // Issue #35: the union of existing category names, offered as a dropdown
+  // in the add-feed and edit-feed forms so the user can reuse a name instead
+  // of retyping it.
+  const existingCategories = user
+    ? await prisma.category.findMany({
+        where: { userId: user.id },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      }).then((rows) => rows.map((r) => r.name))
+    : [];
+
   return (
     <KeyGate withKeyBar={false}>
       {user && (
@@ -26,7 +37,7 @@ export default async function FeedsPreference() {
           </p>
 
           <div className="mt-5">
-            <FeedUrlForm />
+            <FeedUrlForm existingCategories={existingCategories} />
           </div>
 
           <div className="mt-6">
@@ -34,7 +45,9 @@ export default async function FeedsPreference() {
               Your feeds
             </h2>
             <div className="mt-3 space-y-2">
-              {user && <FeedList userId={user.id} />}
+              {user && (
+                <FeedList userId={user.id} existingCategories={existingCategories} />
+              )}
             </div>
           </div>
         </div>
@@ -43,7 +56,13 @@ export default async function FeedsPreference() {
   );
 }
 
-async function FeedList({ userId }: { userId: string }) {
+async function FeedList({
+  userId,
+  existingCategories,
+}: {
+  userId: string;
+  existingCategories: string[];
+}) {
   const feed_list = await prisma.feeds.findMany({
     where: { userId },
     include: {
@@ -63,7 +82,11 @@ async function FeedList({ userId }: { userId: string }) {
   return (
     <>
       {feeds.map((item: FeedLinks) => (
-        <FeedDeleteForm item={item} key={item.id} />
+        <FeedDeleteForm
+          item={item}
+          existingCategories={existingCategories}
+          key={item.id}
+        />
       ))}
       {feeds.length === 0 && (
         <p className="nn-mut text-sm">No feeds yet.</p>
