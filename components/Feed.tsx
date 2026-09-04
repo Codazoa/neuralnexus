@@ -1,4 +1,5 @@
 import React from "react";
+import { decodeHtmlEntities } from "@/lib/htmlentities";
 
 interface FeedProps {
   title: string;
@@ -75,6 +76,14 @@ const Feed: React.FC<FeedProps> = ({
   // issue #33: clicking a feed entry expands it and shows the content field.
   const [expanded, setExpanded] = React.useState(false);
 
+  // issue #44: feed titles routinely arrive with (double) HTML character
+  // references — e.g. a curly apostrophe as the literal 7 chars `&#8217;`.
+  // The title is rendered as plain React text (not innerHTML), so React shows
+  // those characters verbatim. Decode the safe set to real characters. Runs
+  // once (SSR + client) so the title, the expand arrow, and the YouTube
+  // frame caption below all show the correct glyphs.
+  const displayTitle = decodeHtmlEntities(title);
+
   const safeDate = Number.isNaN(new Date(date).getTime()) ? new Date(0) : new Date(date);
   const formattedDate = safeDate.toLocaleDateString("en-US", {
     day: "numeric",
@@ -111,7 +120,7 @@ const Feed: React.FC<FeedProps> = ({
             aria-expanded={expanded}
             className="text-left hover:underline"
           >
-            {title}
+            {displayTitle}
           </button>
           <span
             className={
@@ -155,7 +164,7 @@ const Feed: React.FC<FeedProps> = ({
         )}
       </div>
 
-      {isVideo && <YoutubeFrame videoId={videoId!} title={title} />}
+      {isVideo && <YoutubeFrame videoId={videoId!} title={displayTitle} />}
     </article>
   );
 };
