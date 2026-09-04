@@ -1,4 +1,5 @@
 import React from "react";
+import { relativeAge } from "@/lib/relativeAge";
 
 interface FeedProps {
   title: string;
@@ -82,6 +83,10 @@ const Feed: React.FC<FeedProps> = ({
     year: "numeric",
   });
 
+  // issue #45: compact relative age ("10m", "1hr", "1d5h"...) for the small
+  // badge in the top-right corner of the card. Runs in SSR + client (pure fn).
+  const age = relativeAge(safeDate);
+
   const isVideo = !!(videoId && /^[A-Za-z0-9_-]{6,}$/.test(videoId));
 
   // Video entries carry the embed itself below — the thumbnail above it
@@ -92,10 +97,21 @@ const Feed: React.FC<FeedProps> = ({
   return (
     <article
       className={
-        "nn-card nn-text overflow-hidden px-0 " +
+        "nn-card nn-text relative overflow-hidden px-0 " +
         (showThumbnail ? "pb-4" : "py-4")
       }
     >
+      {/* issue #45: compact relative age in the top-right of the card, e.g.
+        "10m", "1hr", "1d5h". Absolutely positioned so it works with or without
+        a thumbnail, and does not participate in the flex layout below. */}
+      {age && (
+        <span
+          className="nn-mut pointer-events-none absolute right-2 top-2 select-none rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-medium tabular-nums dark:bg-white/10"
+          aria-label={`posted ${age}`}
+        >
+          {age}
+        </span>
+      )}
       {showThumbnail && <Thumbnail src={thumbnail!} />}
 
       <div className="px-5">
