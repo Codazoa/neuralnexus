@@ -121,6 +121,32 @@ export default function MyFeed() {
   const pageButton =
     'nn-btn nn-btn-ghost !px-3.5 !py-2 disabled:cursor-not-allowed';
 
+  // Shared pagination controls (issue #38). Rendered at the BOTTOM of the
+  // list and (when more than one page exists) at the TOP (issue #40) so
+  // page switching works without scrolling. 10 per page, max
+  // ARTICLES_TO_GET reachable — caps the mounted DOM so /myfeed does not
+  // overflow iOS WebKit's memory budget and crash out a few seconds after
+  // load (the #34 "continuous scroll" regression).
+  const renderPagination = () => (
+    <div className="mt-8 flex items-center justify-center gap-2 sm:gap-3">
+      <button className={pageButton} onClick={() => changePageTo(1)} disabled={safePage <= 1}>
+        First
+      </button>
+      <button className={pageButton} onClick={() => changePage(-1)} disabled={safePage <= 1}>
+        Prev
+      </button>
+      <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
+        {safePage}
+      </span>
+      <button className={pageButton} onClick={() => changePage(1)} disabled={safePage >= max_pages}>
+        Next
+      </button>
+      <button className={pageButton} onClick={() => changePageTo(max_pages)} disabled={safePage >= max_pages}>
+        Last
+      </button>
+    </div>
+  );
+
   const getArticles = useCallback(async () => {
     if (inFlight.current) return; // ignore a second Refresh while already fetching
     inFlight.current = true;
@@ -245,6 +271,12 @@ export default function MyFeed() {
         )}
 
         <div className="mt-5 space-y-3">
+          {/* Top pagination (issue #40): same First/Prev/Next/Last controls as
+               the bottom, for quick page switching without scrolling. Only
+               shown when more than one page exists. */}
+          {max_pages > 1 && (
+            <div className="mb-0 sm:mb-1 [&>div]:mt-0">{renderPagination()}</div>
+          )}
           {error && (
             <p className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
               {error}
@@ -275,28 +307,13 @@ export default function MyFeed() {
           ))}
         </div>
 
-        {/* Pagination (issue #38): caps the mounted DOM so /myfeed does not
-             overflow iOS WebKit's memory budget and crash out a few seconds
-             after load. 10 per page, max ARTICLES_TO_GET reachable. The
-             #34 "continuous scroll" change removed these controls — that was
-             the regression this issue reports. */}
-        <div className="mt-8 flex items-center justify-center gap-2 sm:gap-3">
-          <button className={pageButton} onClick={() => changePageTo(1)} disabled={safePage <= 1}>
-            First
-          </button>
-          <button className={pageButton} onClick={() => changePage(-1)} disabled={safePage <= 1}>
-            Prev
-          </button>
-          <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
-            {safePage}
-          </span>
-          <button className={pageButton} onClick={() => changePage(1)} disabled={safePage >= max_pages}>
-            Next
-          </button>
-          <button className={pageButton} onClick={() => changePageTo(max_pages)} disabled={safePage >= max_pages}>
-            Last
-          </button>
-        </div>
+        {/* Bottom pagination (issue #38): caps the mounted DOM so /myfeed
+             does not overflow iOS WebKit's memory budget and crash out a
+             few seconds after load. 10 per page, max ARTICLES_TO_GET
+             reachable. The #34 "continuous scroll" change removed these
+             controls — that was the regression this issue reports.
+             Mirrored at the top of the list for issue #40. */}
+        <div className="[&>div]:mt-8">{renderPagination()}</div>
       </div>
     </div>
   );
