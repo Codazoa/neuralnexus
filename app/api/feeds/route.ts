@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/key';
 import { isYouTubeChannelUrl, resolveYouTubeChannel } from '@/lib/youtube';
+import { isRedditCommunityUrl, resolveRedditFeed } from '@/lib/reddit';
 import { fetchFeedTitle } from '@/lib/feedmeta';
 
 interface CategoryNameInput {
@@ -54,20 +55,33 @@ export async function PUT(request: NextRequest) {
   }
   const names = normalizeCategories(data.categories);
 
-  // YouTube channel -> canonical RSS feed url. Falls back to the entered url on
-  // failure so a bad/unknown link still behaves exactly like it did before.
-  // Also captures the channel's display name when the page had to be fetched
-  // (issue #29) — we prefer it over the feed's <title>, which is the only thing
-  // that reliably survives when fetchFeedTitle can't reach the feed itself.
+  // A link the user can paste that we know how to convert into a working RSS
+  // feed — YouTube channels (issue #13/#29) and Reddit communities (issue #46) —
+  // is resolved to its canonical feed url so we store a feed the reader can
+  // actually parse. Anything unresolvable is stored as-is, unchanged.
   let feedUrl = enteredUrl;
   let resolved: boolean;
+  let resolvedKind: 'youtube' | 'reddit' | null = null;
   let learnedName: string | null = null;
   if (isYouTubeChannelUrl(enteredUrl)) {
     const conv = await resolveYouTubeChannel(enteredUrl);
     if (conv) {
       feedUrl = conv.feedUrl;
       resolved = true;
+      resolvedKind = 'youtube';
       learnedName = conv.name;
+    } else {
+      resolved = false;
+    }
+  } else if (isRedditCommunityUrl(enteredUrl)) {
+    const conv = resolveRedditFeed(enteredUrl);
+    if (conv) {
+      feedUrl = conv.feedUrl;
+      resolved = true;
+      resolvedKind = 'reddit';
+      // We don't hard-set the community name: fetchFeedTitle below reads the
+      // feed's own <title> (e.g. "r/space"), which is the friendlier label.
+      learnedName = conv.community;
     } else {
       resolved = false;
     }
@@ -76,21 +90,24 @@ export async function PUT(request: NextRequest) {
   }
 
   // Learn a human-friendly name for the feed (issue #26) before we store it:
-  // the feed's own <title> (channel name for YouTube). Failures leave the
-  // name unset so the UI falls back to the hostname; either way the feed is
-  // still added. The channel-name learned during resolution (issue #29) wins
-  // when it is present, because it does not depend on being able to fetch the
-  // feed itself.
-  const feedTitle = learnedName ? null : await fetchFeedTitle(feedUrl);
+  // the feed's own <title>. For Reddit that is the subreddit name (e.g.
+  // "r/space"); for YouTube it is the channel name. The channel/community name
+  // learned during resolution (issue #29) wins when present, because it does
+  // not depend on being able to reach the feed itself. Failures leave the name
+  // unset so the UI falls back to the hostname; the feed is always still added.
+  const feedTitle = learnedName ? learnedName : await fetchFeedTitle(feedUrl);
   learnedName = learnedName || feedTitle;
 
   const existing = await prisma.feeds.findFirst({
     where: { userId: user.id, feed_url: feedUrl },
   });
   if (existing) {
-    const message = resolved
-      ? 'This channel is already subscribed'
-      : 'Duplicate feed url';
+    const message =
+      resolvedKind === 'youtube'
+        ? 'This channel is already subscribed'
+        : resolvedKind === 'reddit'
+          ? 'This community is already subscribed'
+          : 'Duplicate feed url';
     return NextResponse.json({ error: message }, { status: 409 });
   }
 
