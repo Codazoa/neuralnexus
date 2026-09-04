@@ -1,16 +1,13 @@
 'use client'
 
 import { Menu, Transition } from '@headlessui/react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Fragment } from 'react';
-import { SignInButton, SignOutButton } from './buttons';
-import AuthCheck from '@/components/AuthCheck';
 
 const links = [
   { href: '/', label: 'Home' },
-  { href: '/myfeed', label: 'MyFeed' },
-  { href: '/preferences/user' , label: 'Preferences' },
+  { href: '/myfeed', label: 'My Feed' },
+  { href: '/preferences/feeds', label: 'Feeds' },
   { href: '/about', label: 'About' },
 ]
 
@@ -18,13 +15,30 @@ export default function DropDownMenu() {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
-        <Menu.Button className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-          <Image
-            src="/artificial-intelligence.png"
-            width={50}
-            height={30}
-            alt="NeuralNexus Logo" 
-          />
+        {/* Icon-only ghost button so it matches the Refresh + Theme buttons
+            (issue #30: it was a large 44x28 image and too dark to see in
+            dark mode). The `nn-btn-ghost` surface is theme-aware, so it
+            stays visible on both `--nn-surface` values. */}
+        <Menu.Button
+          className="nn-btn nn-btn-ghost !px-2.5 !py-2 text-base leading-none"
+          aria-label="Open navigation menu"
+          title="Menu"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18" />
+            <path d="M3 12h18" />
+            <path d="M3 18h18" />
+          </svg>
         </Menu.Button>
       </div>
 
@@ -37,12 +51,17 @@ export default function DropDownMenu() {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <Menu.Items className="absolute right-0 z-30 mt-2 w-52 origin-top-right nn-surface rounded-lg border nn-border shadow-xl">
           <div className="py-1">
             {links.map((link) => (
               <Menu.Item key={link.href} as={Fragment}>
                 {({ active }) => (
-                  <Link className={`block px-4 py-2 text-sm ${ active ? 'bg-blue-500 text-white': 'bg-white text-black'}`}
+                  <Link
+                    className={`block rounded-md px-4 py-2 text-sm transition ${
+                      active
+                        ? 'nn-accent-soft font-medium'
+                        : 'nn-mut'
+                    }`}
                     href={link.href}
                   >
                     {link.label}
@@ -50,18 +69,6 @@ export default function DropDownMenu() {
                 )}
               </Menu.Item>
             ))}
-          </div>
-          <div className='py-1'>
-            <Menu.Item as='button'>
-            {({ active }) => (
-              <div className={`block px-4 py-2 text-sm ${ active ? 'bg-blue-500 text-white' : 'bg-white text-black'}`}>
-                <SignInButton />
-                <AuthCheck>
-                  <SignOutButton />
-                </AuthCheck>
-              </div>
-            )}
-            </Menu.Item>
           </div>
         </Menu.Items>
       </Transition>

@@ -1,0 +1,66 @@
+name: Deploy dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+# No repo secrets are required anymore — sign-in is the local private
+# key and the key itself is never stored server-side. See
+# .github/secrets.example.txt (optional-only) for the one optional env.
+env:
+  NN_COOKIE_INSECURE: "1"
+
+jobs:
+  build-and-serve:
+    runs-on: [self-hosted, linux]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -t neuralnexus:dev .
+
+      - name: Kill previous container
+        run: |
+          docker rm -f neuralnexus || true
+
+      - name: Ensure SQLite data volume exists
+        # Named volume created on first use; keeps the SQLite file
+        # across container rebuilds. Bind-mounts are fine too.
+        run: |
+          docker volume inspect nn-sqlite >/dev/null 2>&1 \
+            || docker volume create nn-sqlite
+
+      - name: Run
+        run: |
+          docker run -d \
+            --name neuralnexus \
+            --restart unless-stopped \
+            --network host \
+            -e NEXT_TELEMETRY_DISABLED=1 \
+            -e DATABASE_URL="file:/data/dev.db" \
+            -e NN_COOKIE_INSECURE="1" \
+            -v nn-sqlite:/data \
+            neuralnexus:dev
+          docker logs --tail 30 neuralnexus
+
+      - name: Health check
+        # The app boots with Prisma (entrypoint runs `migrate deploy`
+        # first and the query engine loads), so a 200 here is proof the
+        # SQLite database is reachable and queryable.
+        run: |
+          for i in $(seq 1 90); do
+            if docker inspect -f '{{.State.Running}}' neuralnexus 2>/dev/null | grep -q true \
+               && curl -fsSL http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              echo "healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "--- container state ---"
+          docker inspect -f '{{.State.Status}} {{.State.Error}}' neuralnexus || true
+          echo "--- container logs ---"
+          docker logs --tail 200 neuralnexus || true
+          exit 1
