@@ -1,4 +1,6 @@
 import React from "react";
+import { relativeAge } from "@/lib/relativeAge";
+import { decodeHtmlEntities } from "@/lib/htmlentities";
 
 interface FeedProps {
   title: string;
@@ -75,12 +77,24 @@ const Feed: React.FC<FeedProps> = ({
   // issue #33: clicking a feed entry expands it and shows the content field.
   const [expanded, setExpanded] = React.useState(false);
 
+  // issue #44: feed titles routinely arrive with (double) HTML character
+  // references — e.g. a curly apostrophe as the literal 7 chars `&#8217;`.
+  // The title is rendered as plain React text (not innerHTML), so React shows
+  // those characters verbatim. Decode the safe set to real characters. Runs
+  // once (SSR + client) so the title, the expand arrow, and the YouTube
+  // frame caption below all show the correct glyphs.
+  const displayTitle = decodeHtmlEntities(title);
+
   const safeDate = Number.isNaN(new Date(date).getTime()) ? new Date(0) : new Date(date);
   const formattedDate = safeDate.toLocaleDateString("en-US", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+
+  // issue #45: compact relative age ("10m", "1hr", "1d5h"...) for the small
+  // badge in the top-right corner of the card. Runs in SSR + client (pure fn).
+  const age = relativeAge(safeDate);
 
   const isVideo = !!(videoId && /^[A-Za-z0-9_-]{6,}$/.test(videoId));
 
@@ -92,10 +106,21 @@ const Feed: React.FC<FeedProps> = ({
   return (
     <article
       className={
-        "nn-card nn-text overflow-hidden px-0 " +
+        "nn-card nn-text relative overflow-hidden px-0 " +
         (showThumbnail ? "pb-4" : "py-4")
       }
     >
+      {/* issue #45: compact relative age in the top-right of the card, e.g.
+        "10m", "1hr", "1d5h". Absolutely positioned so it works with or without
+        a thumbnail, and does not participate in the flex layout below. */}
+      {age && (
+        <span
+          className="nn-mut pointer-events-none absolute right-2 top-2 select-none rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-medium tabular-nums dark:bg-white/10"
+          aria-label={`posted ${age}`}
+        >
+          {age}
+        </span>
+      )}
       {showThumbnail && <Thumbnail src={thumbnail!} />}
 
       <div className="px-5">
@@ -111,7 +136,7 @@ const Feed: React.FC<FeedProps> = ({
             aria-expanded={expanded}
             className="text-left hover:underline"
           >
-            {title}
+            {displayTitle}
           </button>
           <span
             className={
@@ -155,7 +180,7 @@ const Feed: React.FC<FeedProps> = ({
         )}
       </div>
 
-      {isVideo && <YoutubeFrame videoId={videoId!} title={title} />}
+      {isVideo && <YoutubeFrame videoId={videoId!} title={displayTitle} />}
     </article>
   );
 };

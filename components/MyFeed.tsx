@@ -44,6 +44,31 @@ interface FeedLinksPayload {
   failedFeeds?: FailedFeed[];
 }
 
+// Issue #42: the user's selected category filter survives across sessions.
+// Stored as a JSON array of lower-cased category names in localStorage, keyed
+// per browser (this is a single-user local app, so per-browser is the right
+// scope — no server round trip, and it works offline).
+const CATEGORIES_STORAGE_KEY = 'nn.myfeed.categories.v1';
+
+function readStoredCategories(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(CATEGORIES_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set(
+        parsed
+          .filter((x): x is string => typeof x === 'string')
+          .map((x) => x.toLowerCase())
+      );
+    }
+  } catch {
+    // Corrupt / unavailable storage — fall back to "All".
+  }
+  return new Set();
+}
+
 export default function MyFeed() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [failedFeeds, setFailedFeeds] = useState<FailedFeed[]>([]);
@@ -57,7 +82,11 @@ export default function MyFeed() {
   // "All" (everything). Toggle as many categories as you like — an item
   // shows if it matches ANY of them (OR semantics), e.g. tech + gaming shows
   // both and still hides politics.
-  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+  // Issue #42: seeded from localStorage so the user's last selection
+  // survives across sessions (lazy init keeps this client-only).
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(
+    () => readStoredCategories()
+  );
   // Page index (issue #38): restored from #34's removal — see PAGES_TO_SHOW.
   const [page, setPage] = useState(1);
 
@@ -176,6 +205,22 @@ export default function MyFeed() {
       setLoading(false);
     }
   }, []);
+
+  // Issue #42: persist the selected category set across sessions. Runs on
+  // every change to `activeCategories` (and once on mount to seed a
+  // clean "All" if the user has never toggled anything).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        CATEGORIES_STORAGE_KEY,
+        JSON.stringify(Array.from(activeCategories))
+      );
+    } catch {
+      // Storage unavailable (private mode / quota) — ignore, the filter
+      // still works in-session.
+    }
+  }, [activeCategories]);
 
   // Initial fetch.
   useEffect(() => {
