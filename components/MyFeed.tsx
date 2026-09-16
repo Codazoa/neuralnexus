@@ -24,8 +24,8 @@ interface Article {
 // "continuous scroll" change) loads every thumbnail image + every embedded
 // YouTube iframe simultaneously, which overflows iOS WebKit's memory budget
 // and crash-kills the page ("A problem repeatedly occurred on …"). Cap the
-// mounted DOM again: 10 articles per page, 100 articles reachable in total.
-const PAGES_TO_SHOW = 10;
+// mounted DOM: a page-size the user picks (issue #51, default 10), and 100
+// articles reachable in total (ARTICLES_TO_GET below).
 const ARTICLES_TO_GET = 100;
 
 /** A feed the server tried to load this cycle but couldn't (issue #25). */
@@ -49,6 +49,23 @@ interface FeedLinksPayload {
 // per browser (this is a single-user local app, so per-browser is the right
 // scope — no server round trip, and it works offline).
 const CATEGORIES_STORAGE_KEY = 'nn.myfeed.categories.v1';
+
+// Issue #51: allowed entries-per-page values ("from 10 to 25 to 50 to 100").
+const PAGE_SIZES = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_STORAGE_KEY = 'nn.myfeed.pageSize.v1';
+
+function readStoredPageSize(): number {
+  if (typeof window === 'undefined') return DEFAULT_PAGE_SIZE;
+  try {
+    const raw = window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+    const parsed = raw ? Number(raw) : DEFAULT_PAGE_SIZE;
+    if (PAGE_SIZES.includes(parsed)) return parsed;
+  } catch {
+    // Corrupt / unavailable storage — fall back to the default.
+  }
+  return DEFAULT_PAGE_SIZE;
+}
 
 function readStoredCategories(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -87,8 +104,15 @@ export default function MyFeed() {
   const [activeCategories, setActiveCategories] = useState<Set<string>>(
     () => readStoredCategories()
   );
-  // Page index (issue #38): restored from #34's removal — see PAGES_TO_SHOW.
+  // Page index (issue #38): restored from #34's removal — see the pagination
+  // cap comment above.
   const [page, setPage] = useState(1);
+  // Entries per page (issue #51): user selects from PAGE_SIZES; seeded from
+  // localStorage (lazy init keeps this client-only) so the choice survives
+  // across sessions — same per-browser scope as the category filter (#42).
+  const [pageSize, setPageSize] = useState<number>(() =>
+    readStoredPageSize()
+  );
 
   // Union of category names across loaded feeds (case-insensitively unique,
   // insertion order preserved — the order feeds were added in).
@@ -118,18 +142,25 @@ export default function MyFeed() {
           )
         );
 
-  // Issue #38: pagination restored (10 per page, capped at ARTICLES_TO_GET).
-  // `visible` is filtered by the active categories; clamp the page we render
-  // to what actually exists so a stale page index never shows an empty list.
+  // Issue #38: pagination restored (per-page cap from issue #51's selector,
+  // capped at ARTICLES_TO_GET). `visible` is filtered by the active
+  // categories; clamp the page we render to what actually exists so a stale
+  // page index never shows an empty list.
   const max_pages = Math.max(
     1,
-    Math.ceil(Math.min(ARTICLES_TO_GET, visible.length) / PAGES_TO_SHOW)
+    Math.ceil(Math.min(ARTICLES_TO_GET, visible.length) / pageSize)
   );
   const safePage = Math.max(1, Math.min(page, max_pages));
   const changePage = (delta: number) =>
     setPage((p) => Math.max(1, Math.min(max_pages, p + delta)));
   const changePageTo = (target: number) =>
     setPage(Math.max(1, Math.min(max_pages, target)));
+  // Issue #51: switching entries-per-page re-buckets the items — jump back
+  // to the first page so we never land on a now-empty page.
+  const changePageSize = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
 
   const toggleCategory = (name: string | null) => {
     const next = new Set(activeCategories);
@@ -152,27 +183,50 @@ export default function MyFeed() {
 
   // Shared pagination controls (issue #38). Rendered at the BOTTOM of the
   // list and (when more than one page exists) at the TOP (issue #40) so
-  // page switching works without scrolling. 10 per page, max
-  // ARTICLES_TO_GET reachable — caps the mounted DOM so /myfeed does not
-  // overflow iOS WebKit's memory budget and crash out a few seconds after
-  // load (the #34 "continuous scroll" regression).
-  const renderPagination = () => (
-    <div className="mt-8 flex items-center justify-center gap-2 sm:gap-3">
-      <button className={pageButton} onClick={() => changePageTo(1)} disabled={safePage <= 1}>
-        First
-      </button>
-      <button className={pageButton} onClick={() => changePage(-1)} disabled={safePage <= 1}>
-        Prev
-      </button>
-      <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
-        {safePage}
-      </span>
-      <button className={pageButton} onClick={() => changePage(1)} disabled={safePage >= max_pages}>
-        Next
-      </button>
-      <button className={pageButton} onClick={() => changePageTo(max_pages)} disabled={safePage >= max_pages}>
-        Last
-      </button>
+  // page switching works without scrolling. Entries-per-page from issue
+  // #51's selector (default 10), max ARTICLES_TO_GET reachable — caps the
+  // mounted DOM so /myfeed does not overflow iOS WebKit's memory budget
+  // and crash out a few seconds after load (the #34 "continuous scroll"
+  // regression).
+  const renderPagination = (withPerPageSelector = false) => (
+    <div className="mt-8 flex flex-col items-center gap-3.5">
+      <div className="flex items-center justify-center gap-2 sm:gap-3">
+        <button className={pageButton} onClick={() => changePageTo(1)} disabled={safePage <= 1}>
+          First
+        </button>
+        <button className={pageButton} onClick={() => changePage(-1)} disabled={safePage <= 1}>
+          Prev
+        </button>
+        <span className="nn-text min-w-8 text-center text-2xl font-bold sm:text-3xl">
+          {safePage}
+        </span>
+        <button className={pageButton} onClick={() => changePage(1)} disabled={safePage >= max_pages}>
+          Next
+        </button>
+        <button className={pageButton} onClick={() => changePageTo(max_pages)} disabled={safePage >= max_pages}>
+          Last
+        </button>
+      </div>
+      {/* Per-page selector (issue #51): bottom row, right under the page
+           controls, only on the bottom instance — the top one stays the
+           lean First/Prev/Next/Last strip. */}
+      {withPerPageSelector && (
+        <label className="flex items-center gap-2 text-sm">
+          <span className="nn-mut">Per page</span>
+          <select
+            className="nn-input !w-auto !px-2.5 !py-1.5 !text-sm"
+            value={pageSize}
+            onChange={(e) => changePageSize(Number(e.target.value))}
+            aria-label="Entries per page"
+          >
+            {PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   );
 
@@ -221,6 +275,18 @@ export default function MyFeed() {
       // still works in-session.
     }
   }, [activeCategories]);
+
+  // Issue #51: persist the per-page choice across sessions (same shape as
+  // the category persistence above).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(pageSize));
+    } catch {
+      // Storage unavailable (private mode / quota) — ignore, the selector
+      // still works in-session.
+    }
+  }, [pageSize]);
 
   // Initial fetch.
   useEffect(() => {
@@ -338,7 +404,7 @@ export default function MyFeed() {
             </p>
           )}
 
-          {visible.slice((safePage - 1) * PAGES_TO_SHOW, safePage * PAGES_TO_SHOW).map((item, i) => (
+          {visible.slice((safePage - 1) * pageSize, safePage * pageSize).map((item, i) => (
             <Feed
               key={item.link || i}
               title={item.title || '(untitled)'}
@@ -354,11 +420,11 @@ export default function MyFeed() {
 
         {/* Bottom pagination (issue #38): caps the mounted DOM so /myfeed
              does not overflow iOS WebKit's memory budget and crash out a
-             few seconds after load. 10 per page, max ARTICLES_TO_GET
-             reachable. The #34 "continuous scroll" change removed these
-             controls — that was the regression this issue reports.
-             Mirrored at the top of the list for issue #40. */}
-        <div className="[&>div]:mt-8">{renderPagination()}</div>
+             few seconds after load. The #34 "continuous scroll" change
+             removed these controls — that was the regression this issue
+             reports. Mirrored at the top of the list for issue #40. The
+             per-page selector (issue #51) lives here, under the controls. */}
+        <div className="[&>div]:mt-8">{renderPagination(true)}</div>
       </div>
     </div>
   );
