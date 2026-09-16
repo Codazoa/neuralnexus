@@ -24,9 +24,11 @@ interface Article {
 // "continuous scroll" change) loads every thumbnail image + every embedded
 // YouTube iframe simultaneously, which overflows iOS WebKit's memory budget
 // and crash-kills the page ("A problem repeatedly occurred on …"). Cap the
-// mounted DOM: a page-size the user picks (issue #51, default 10), and 100
-// articles reachable in total (ARTICLES_TO_GET below).
-const ARTICLES_TO_GET = 100;
+// mounted DOM: a page-size the user picks (issue #51, default 10), capped at
+// MAX_PAGES reachable pages (issue #56: at most 10 pages — so the per-page
+// choice sets how far back one can go, up to 500 entries at the max 50/page,
+// and only one page's worth is ever mounted at a time).
+const MAX_PAGES = 10;
 
 /** A feed the server tried to load this cycle but couldn't (issue #25). */
 interface FailedFeed {
@@ -145,13 +147,11 @@ export default function MyFeed() {
         );
 
   // Issue #38: pagination restored (per-page cap from issue #51's selector,
-  // capped at ARTICLES_TO_GET). `visible` is filtered by the active
+  // capped at MAX_PAGES — issue #56). `visible` is filtered by the active
   // categories; clamp the page we render to what actually exists so a stale
   // page index never shows an empty list.
-  const max_pages = Math.max(
-    1,
-    Math.ceil(Math.min(ARTICLES_TO_GET, visible.length) / pageSize)
-  );
+  const capped = Math.min(MAX_PAGES * pageSize, visible.length);
+  const max_pages = Math.max(1, Math.ceil(capped / pageSize));
   const safePage = Math.max(1, Math.min(page, max_pages));
   const changePage = (delta: number) =>
     setPage((p) => Math.max(1, Math.min(max_pages, p + delta)));
@@ -186,7 +186,7 @@ export default function MyFeed() {
   // Shared pagination controls (issue #38). Rendered at the BOTTOM of the
   // list and (when more than one page exists) at the TOP (issue #40) so
   // page switching works without scrolling. Entries-per-page from issue
-  // #51's selector (default 10), max ARTICLES_TO_GET reachable — caps the
+  // #51's selector (default 10), capped at MAX_PAGES pages (issue #56) — caps the
   // mounted DOM so /myfeed does not overflow iOS WebKit's memory budget
   // and crash out a few seconds after load (the #34 "continuous scroll"
   // regression).
