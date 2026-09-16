@@ -50,8 +50,10 @@ interface FeedLinksPayload {
 // scope — no server round trip, and it works offline).
 const CATEGORIES_STORAGE_KEY = 'nn.myfeed.categories.v1';
 
-// Issue #51: allowed entries-per-page values ("from 10 to 25 to 50 to 100").
-const PAGE_SIZES = [10, 25, 50, 100];
+// Issue #51: allowed entries-per-page values. 100 was dropped in issue #54:
+// loading 100 entries per page (100 thumbnails + 100 iframes at once) caused
+// Safari to crash, so the offered maximum is now 50.
+const PAGE_SIZES = [10, 25, 50];
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_STORAGE_KEY = 'nn.myfeed.pageSize.v1';
 
