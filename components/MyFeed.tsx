@@ -5,6 +5,9 @@ import { REFRESH_EVENTS } from './RefreshButton';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Article {
+  /** Stable feed-scoped id from the links route (`<feedId>::<link|guid|title>`);
+   *  keys list items and read/unread state (issue #60). */
+  id?: string;
   title?: string;
   link?: string;
   pubDate?: string;
@@ -119,6 +122,12 @@ export default function MyFeed() {
   const [pageSize, setPageSize] = useState<number>(() =>
     readStoredPageSize()
   );
+  // issue #60: read/unread. The set of item ids the user has marked read on
+  // this device (the server is the source of truth; this is an optimistic
+  // in-memory mirror). Loaded from the reader once on mount (#60) — NOT
+  // localStorage, because read-state is deliberately scoped per reader, not
+  // per browser, and must survive an app restart via the cache DB (ADR-002).
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
 
   // Union of category names across loaded feeds (case-insensitively unique,
   // insertion order preserved — the order feeds were added in).
@@ -298,6 +307,57 @@ export default function MyFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // issue #60: load the reader's read/unread set once on mount. Independent of
+  // the articles fetch so a read-state hiccup never blocks the feed list.
+  const loadReadState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/readstate', { method: 'GET' });
+      if (res.status === 401) return; // signed out — read-state is meaningless
+      const data = (await res.json()) as { itemIds?: string[] };
+      if (Array.isArray(data.itemIds)) {
+        setReadIds(new Set(data.itemIds));
+      }
+    } catch {
+      // Read-state is a nice-to-have; a failed load leaves everything "unread"
+      // rather than hiding the list.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReadState();
+  }, [loadReadState]);
+
+  // issue #60: flip one item. Optimistic (set local state first) then persist;
+  // revert the row if the server refuses (e.g. 401) so the UI never lies.
+  const toggleRead = useCallback((itemId: string, read: boolean) => {
+    const prev = readIds;
+    const next = new Set(prev);
+    if (read) next.add(itemId);
+    else next.delete(itemId);
+    setReadIds(next);
+    fetch('/api/readstate', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ itemId, read }),
+    }).catch(() => {
+      setReadIds(prev); // rollback on network failure
+    });
+  }, [readIds]);
+
+  // issue #60: mark every cached item read (the reader's "Mark all as read").
+  const markAllRead = useCallback(async () => {
+    try {
+      const res = await fetch('/api/readstate', { method: 'POST' });
+      const data = (await res.json().catch(() => null)) as
+        | { itemIds?: string[] }
+        | null;
+      if (data && Array.isArray(data.itemIds)) setReadIds(new Set(data.itemIds));
+    } catch {
+      // Best-effort: the server still marked what it could; the next load
+      // (mount / refresh) reconciles with whatever actually landed.
+    }
+  }, []);
+
   // Re-fetch when the top-nav Refresh button fires a request (issue #25).
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -315,7 +375,19 @@ export default function MyFeed() {
           <h1 className="nn-text text-2xl font-bold tracking-tight sm:text-3xl">
             My Feed
           </h1>
-          {loading && <span className="text-sm">loading…</span>}
+          <div className="flex items-center gap-3">
+            {loading && <span className="text-sm">loading…</span>}
+            {/* issue #60: bulk read control (PLAN M1 "mark all read"). Sits in
+                the header next to the list; per-feed scoping is P2. */}
+            <button
+              type="button"
+              className="nn-btn nn-btn-ghost !px-3 !py-1.5 !text-xs disabled:cursor-not-allowed"
+              onClick={() => void markAllRead()}
+              disabled={loading || articles.length === 0}
+            >
+              Mark all as read
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -410,7 +482,7 @@ export default function MyFeed() {
 
           {visible.slice((safePage - 1) * pageSize, safePage * pageSize).map((item, i) => (
             <Feed
-              key={item.link || i}
+              key={item.id || item.link || i}
               title={item.title || '(untitled)'}
               link={item.link || '#'}
               date={item.pubDate ? new Date(item.pubDate) : new Date(0)}
@@ -419,6 +491,12 @@ export default function MyFeed() {
               videoId={item.videoId}
               media={item.media}
               content={item.content}
+              isRead={item.id ? readIds.has(item.id) : false}
+              onToggleRead={
+                item.id
+                  ? (read) => toggleRead(item.id as string, read)
+                  : undefined
+              }
             />
           ))}
         </div>

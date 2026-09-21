@@ -197,6 +197,13 @@ export interface ItemMedia {
 }
 
 interface FeedItem {
+  /**
+   * Stable, feed-scoped item id (issue #60): `<feedId>::<link|title>`.
+   * Used as the key for read/unread state and as the React list key, so an
+   * item keeps the same id whether it was served fresh or from cache and
+   * regardless of its position in the aggregate list.
+   */
+  id: string;
   title: string | undefined;
   link: string | undefined;
   pubDate: string | undefined;
@@ -246,7 +253,8 @@ interface CacheRow {
 function shapeItems(
   rawItems: any[],
   source: string,
-  feedCats: string[]
+  feedCats: string[],
+  feedId: string
 ): FeedItem[] {
   return rawItems.map((rawIt: any): FeedItem => {
     const videoId = (rawIt['yt:videoId'] && String(rawIt['yt:videoId'])) || null;
@@ -272,6 +280,7 @@ function shapeItems(
     }
 
     return {
+      id: itemId(feedId, rawIt),
       title: rawIt.title,
       link: rawIt.link,
       pubDate: rawIt.pubDate,
@@ -294,6 +303,25 @@ function shapeItems(
       media: extractMedia(rawIt),
     };
   });
+}
+
+/**
+ * Derive a stable, feed-scoped item id (issue #60). The same formula is
+ * applied at every push site (fresh fetch, cache fallback, stale fallback)
+ * so an item's id is independent of whether it was served fresh or from the
+ * cache and of its position in the aggregate list.
+ *
+ * `<link>` (the canonical item URL) is the primary key; `<guid>` / a
+ * truncated `<title>` fall back for feeds whose items omit `link`.
+ * Namespaced by `feedId` so two feeds that happen to reuse a title never
+ * collide.
+ */
+function itemId(feedId: string, it: { link?: unknown; guid?: unknown; title?: unknown }): string {
+  const link = typeof it.link === 'string' && it.link.trim() ? it.link.trim() : undefined;
+  const guid = typeof it.guid === 'string' && it.guid.trim() ? it.guid.trim() : undefined;
+  const title = typeof it.title === 'string' ? it.title.trim().slice(0, 120) : '';
+  const stem = link || guid || title || 'item';
+  return `${feedId}::${stem}`;
 }
 
 function sortByPubDateDesc(items: FeedItem[]): FeedItem[] {
@@ -423,7 +451,7 @@ export async function GET(req: NextRequest) {
           rawIt = [];
         }
         for (const it of rawIt) {
-          items.push({ ...it, feedCategories: feedCats, source: it.source || cached.source });
+          items.push({ ...it, id: it.id || itemId(row.id, it), feedCategories: feedCats, source: it.source || cached.source });
         }
         anythingFromCached = true;
         return;
@@ -470,7 +498,7 @@ export async function GET(req: NextRequest) {
             let cachedItems: FeedItem[] = [];
             try { cachedItems = JSON.parse(cached.items) as FeedItem[]; } catch { cachedItems = []; }
             for (const it of cachedItems) {
-              items.push({ ...it, feedCategories: feedCats, source: it.source || cached.source });
+              items.push({ ...it, id: it.id || itemId(row.id, it), feedCategories: feedCats, source: it.source || cached.source });
             }
             anythingFromCached = true;
             anyStale = true;
@@ -479,7 +507,7 @@ export async function GET(req: NextRequest) {
           failedFeeds.push({ label, url: row.feed_url, error: 'empty feed' });
           return;
         }
-        const shaped = shapeItems(raw, source, feedCats);
+        const shaped = shapeItems(raw, source, feedCats, row.id);
         items.push(...shaped);
         // Persist the fresh pull so the next request within the TTL is served
         // straight from disk (issue #27).
@@ -499,7 +527,7 @@ export async function GET(req: NextRequest) {
         let cachedItems: FeedItem[] = [];
         try { cachedItems = JSON.parse(cached.items) as FeedItem[]; } catch { cachedItems = []; }
         for (const it of cachedItems) {
-          items.push({ ...it, feedCategories: feedCats, source: it.source || cached.source });
+          items.push({ ...it, id: it.id || itemId(row.id, it), feedCategories: feedCats, source: it.source || cached.source });
         }
         anythingFromCached = true;
         anyStale = true;
