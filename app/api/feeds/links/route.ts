@@ -40,7 +40,7 @@ const PARSER_OPTS = {
   timeout: 20000,
   headers: { 'User-Agent': 'Mozilla/5.0 (compatible; neuralnexus/0.0; RSS)' },
   customFields: {
-    item: ['media:thumbnail', 'media:content', 'enclosure', 'yt:videoId'],
+    item: ['media:thumbnail', 'media:content', 'enclosure', 'yt:videoId', 'itunes:duration'],
   },
 };
 
@@ -113,6 +113,65 @@ function thumbnailFromAny(val: unknown): string | null {
 }
 
 /**
+ * Pull playable audio out of an item's enclosure (issue #58).
+ * rss-parser exposes `enclosure` as one of:
+ *   - a string (bare URL)
+ *   - `{ url, type, length }`
+ *   - an array of the above (feeds that carry several enclosures)
+ *
+ * We only surface enclosures that declare an `audio/*` MIME type. That keeps
+ * the existing `thumbnailFromAny` thumbnail fallback authoritative for image /
+ * untyped enclosures, so an image never accidentally becomes an audio player.
+ * Returns `null` when the item has no audio enclosure (articles, YouTube, news).
+ */
+function extractMedia(rawItem: any): ItemMedia | null {
+  const enclosure = rawItem?.enclosure;
+  if (!enclosure) return null;
+  const candidates: Array<Record<string, unknown>> = [];
+  if (Array.isArray(enclosure)) {
+    for (const e of enclosure) {
+      if (e && typeof e === 'object') candidates.push(e as Record<string, unknown>);
+    }
+  } else if (typeof enclosure === 'object') {
+    candidates.push(enclosure as Record<string, unknown>);
+  } else {
+    // Bare URL with no declared type — we cannot confirm it is audio, so leave
+    // it to the thumbnail path (it may well be the cover image).
+    return null;
+  }
+  const audio = candidates.find((e) => String(e.type || '').startsWith('audio/'));
+  if (!audio) return null;
+  const url = thumbnailFromAny(audio);
+  if (!url) return null;
+  return {
+    url,
+    type: String(audio.type || 'audio/'),
+    length: parseItunesDuration(rawItem),
+  };
+}
+
+/**
+ * Normalise an `itunes:duration` value to whole seconds. Podcasts encode the
+ * MP3 length as "SS", "MM:SS", "H:MM:SS", or a float like "42.5" — best effort,
+ * returns `undefined` when absent or unparseable so the player just omits it.
+ */
+function parseItunesDuration(rawItem: any): number | undefined {
+  const raw = rawItem?.['itunes:duration'];
+  if (raw == null) return undefined;
+  const s = String(raw).trim();
+  if (!s) return undefined;
+  if (s.includes(':')) {
+    const parts = s.split(':').map((p) => parseInt(p, 10));
+    if (parts.some((n) => Number.isNaN(n))) return undefined;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return parts[0];
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? Math.round(n) : undefined;
+}
+
+/**
  * A human label for a feed that cannot be resolved any cleaner way.
  * Hostname of the feed URL, with the leading `www.` stripped.
  */
@@ -122,6 +181,19 @@ function hostnameLabel(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * Inline playable media (issue #58, ADR-008 `media` extension). Today this is
+ * audio: a podcast episode's RSS `<enclosure type="audio/…">`. `length` is the
+ * MP3 duration in seconds when the `itunes:duration` extension is present.
+ * Only audio/* enclosures are surfaced — image enclosures keep using the
+ * existing `thumbnail` path.
+ */
+export interface ItemMedia {
+  url: string;
+  type?: string;
+  length?: number;
 }
 
 interface FeedItem {
@@ -135,6 +207,8 @@ interface FeedItem {
   feedCategories: string[];
   /** HTML content of the entry (issue #33) — shown when the card expands. */
   content: string | null;
+  /** Attachable media (audio, issue #58); null when the item has none. */
+  media: ItemMedia | null;
 }
 
 export interface FailedFeed {
@@ -213,6 +287,11 @@ function shapeItems(
         : (typeof rawIt.contentSnippet === 'string' && rawIt.contentSnippet.trim())
         ? rawIt.contentSnippet
         : null,
+      // Inline media (issue #58): audio enclosure → `media`; null for non-audio
+      // items. `extractMedia` reads rawIt.enclosure (normally an object or an
+      // array of objects; a bare URL can't be confirmed as audio, so it is
+      // left to the thumbnail path above).
+      media: extractMedia(rawIt),
     };
   });
 }
