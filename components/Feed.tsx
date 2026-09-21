@@ -16,6 +16,10 @@ interface FeedProps {
   videoId?: string | null;
   /** Inline playable media (audio, issue #58); renders a native player below the title. */
   media?: { url: string; type?: string; length?: number } | null;
+  /** Whether the item is marked read (issue #60). De-emphasises the card. */
+  isRead?: boolean;
+  /** Toggle this item's read state (issue #60). */
+  onToggleRead?: (read: boolean) => void;
 }
 
 /** Hide broken images instead of showing the browser's broken-icon glyph. */
@@ -141,6 +145,8 @@ const Feed: React.FC<FeedProps> = ({
   thumbnail,
   videoId,
   media,
+  isRead = false,
+  onToggleRead,
 }) => {
   // issue #33: clicking a feed entry expands it and shows the content field.
   const [expanded, setExpanded] = React.useState(false);
@@ -171,6 +177,54 @@ const Feed: React.FC<FeedProps> = ({
   const showThumbnail = !!thumbnail && !isVideo;
   const hasContent = !!(content && content.trim());
 
+  // issue #60: read-state de-emphasis. The title drops weight + saturates
+  // down; a small toggle in the meta row flips read/unread.
+  const titleClass = isRead
+    ? "nn-mut mt-2 flex items-start gap-2 text-base font-normal leading-snug sm:text-lg"
+    : "nn-text mt-2 flex items-start gap-2 text-base font-semibold leading-snug sm:text-lg";
+
+  const readToggle = (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        onToggleRead?.(!isRead);
+      }}
+      aria-pressed={isRead}
+      aria-label={isRead ? "Mark as unread" : "Mark as read"}
+      title={isRead ? "Mark as unread" : "Mark as read"}
+      className={
+        "ml-auto inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors " +
+        (isRead
+          ? "nn-border bg-transparent text-current opacity-70"
+          : "nn-border opacity-60 hover:opacity-100")
+      }
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={isRead ? 2.75 : 2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {isRead ? (
+          <>
+            <circle cx="12" cy="12" r="9" fill="currentColor" fillOpacity="0.15" />
+            <path d="m8 12 3 3 5-6" />
+          </>
+        ) : (
+          <>
+            <circle cx="12" cy="12" r="9" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+
   return (
     <article
       className={
@@ -195,9 +249,10 @@ const Feed: React.FC<FeedProps> = ({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           {source && <SourceChip label={source} />}
           <span className="nn-mut text-xs">{formattedDate}</span>
+          {onToggleRead && readToggle}
         </div>
 
-        <h3 className="nn-text mt-2 flex items-start gap-2 text-base font-semibold leading-snug sm:text-lg">
+        <h3 className={titleClass}>
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}

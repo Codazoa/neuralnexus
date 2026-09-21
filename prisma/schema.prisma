@@ -17,6 +17,7 @@ model User {
   apiKey     ApiKey?
   categories Category[]
   feeds      Feeds[]
+  readState  ReadState[]
 }
 
 model ApiKey {
@@ -67,4 +68,23 @@ model FeedCache {
   updatedAt     DateTime @updatedAt
 
   @@id([userId, feedId])
+}
+
+// Read/unread state for feed items (issue #60).
+//
+// Item ids are stable, feed-scoped strings produced by the links route
+// (`<feedId>::<link|guid|title>`), so they are safe as a plain-text key.
+// A row's presence = "read" (readAt is when it was marked). Deleting the
+// row = unread.
+//
+// Local-cache only (ADR-002): read-state is convenience metadata, not
+// authored content. Deleting the backend loses read-state, nothing else.
+// Portability to the pod is a P2/M4 concern.
+model ReadState {
+  userId String
+  itemId String
+  readAt DateTime @default(now())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
 }
