@@ -14,6 +14,8 @@ interface FeedProps {
   thumbnail?: string | null;
   /** YouTube video id; when present we render an embedded player below the title. */
   videoId?: string | null;
+  /** Inline playable media (audio, issue #58); renders a native player below the title. */
+  media?: { url: string; type?: string; length?: number } | null;
 }
 
 /** Hide broken images instead of showing the browser's broken-icon glyph. */
@@ -65,6 +67,71 @@ function YoutubeFrame({ videoId, title }: { videoId: string; title: string }) {
   );
 }
 
+/**
+ * Inline audio player (issue #58) for items carrying a `media` enclosure —
+ * a podcast episode. Rendered below the title, mirroring `YoutubeFrame`.
+ *
+ * `preload="none"` is deliberate: mounting many `<audio>` elements per page has
+ * already cost us an iOS WebKit crash (issues #38 / #54 / #56); a no-preload
+ * player fetches nothing until the user presses play, so a full page of
+ * (empty) players stays cheap and only the active episode streams.
+ */
+function AudioFrame({
+  media,
+  title,
+}: {
+  media: { url: string; type?: string; length?: number };
+  title: string;
+}) {
+  return (
+    <div className="mx-5 mb-4 mt-3">
+      <div className="rounded-lg border nn-border bg-black/5 px-3 py-2 dark:bg-white/5">
+        <audio
+          controls
+          preload="none"
+          src={media.url}
+          title={title || "Audio"}
+          className="h-11 w-full"
+        />
+      </div>
+      <p className="nn-mut mt-1.5 flex items-center gap-1.5 px-0.5 text-xs">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+        <span className="truncate">{title || "Audio"}</span>
+        {typeof media.length === "number" && media.length > 0 && (
+          <span className="nn-mut ml-auto shrink-0 tabular-nums">
+            {formatDuration(media.length)}
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** 95 -> "1:35", 3725 -> "1:02:05". Used for the AudioFrame caption. */
+function formatDuration(total: number): string {
+  const s = Math.max(0, Math.round(total));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  const ss = String(sec).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
 const Feed: React.FC<FeedProps> = ({
   title,
   link,
@@ -73,6 +140,7 @@ const Feed: React.FC<FeedProps> = ({
   source,
   thumbnail,
   videoId,
+  media,
 }) => {
   // issue #33: clicking a feed entry expands it and shows the content field.
   const [expanded, setExpanded] = React.useState(false);
@@ -181,6 +249,7 @@ const Feed: React.FC<FeedProps> = ({
       </div>
 
       {isVideo && <YoutubeFrame videoId={videoId!} title={displayTitle} />}
+      {media && <AudioFrame media={media} title={displayTitle} />}
     </article>
   );
 };

@@ -14,6 +14,8 @@ interface Article {
   thumbnail?: string | null;
   /** YouTube video id (when present shows an embedded player below the title). */
   videoId?: string | null;
+  /** Inline playable media (audio, issue #58) — renders a player below the title. */
+  media?: { url: string; type?: string; length?: number } | null;
   /** Names of the categories this item's feed was filed under (issue #20). */
   feedCategories?: string[] | null;
   /** HTML content of the entry, shown when the card expands (issue #33). */
@@ -415,6 +417,7 @@ export default function MyFeed() {
               source={item.source}
               thumbnail={item.thumbnail}
               videoId={item.videoId}
+              media={item.media}
               content={item.content}
             />
           ))}
